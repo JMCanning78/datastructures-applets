@@ -24,6 +24,7 @@ class OrderedArray(VisualizationApp):
         self.title = title
         self.list = []
         self.buttons = self.makeButtons()
+        self.nItems = 0
 
         #Fill in initial array values with random integers
         # The display items representing these array cells are created later
@@ -72,10 +73,7 @@ class OrderedArray(VisualizationApp):
            
        # j = self.find(val)  # Find where item should go
         k=len(self.list)
-        self.list.append(drawable(None))
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, "nItems", level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)         
+        self.list.append(drawable(None))       
         
         indexK = self.createIndex(len(self.list) -1, 'k', level=-2) # create "k" arrow
         callEnviron |= set(indexK)  
@@ -104,6 +102,10 @@ class OrderedArray(VisualizationApp):
         self.list[k]= (drawable(
             val, self.canvas.itemconfigure(cellPair[0], 'fill')[-1], *cellPair))
         callEnviron ^= set(cellPair)  # New item is no longer temporary
+        
+        # Move nItems pointer
+        self.moveItemsBy(self.nItems, (self.CELL_SIZE, 0))
+        self.wait(0.1)        
 
         self.window.update()  
         self.stopAnimations()
@@ -143,11 +145,7 @@ class OrderedArray(VisualizationApp):
         self.cleanUp(callEnviron)
         self.stopAnimations()
     def removeFromEnd(self):
-        callEnviron = self.createCallEnvironment()
-        
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, "nItems", level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)                
+        callEnviron = self.createCallEnvironment()         
         
         # pop a Drawable from the list
         if len(self.list) == 0:
@@ -161,7 +159,7 @@ class OrderedArray(VisualizationApp):
         self.canvas.delete(n.display_val)
         
         #move nItems pointer
-        self.moveItemsBy(indexDisplay, (-self.CELL_SIZE, 0))
+        self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0))
 
         # update window
         self.window.update()
@@ -259,8 +257,7 @@ class OrderedArray(VisualizationApp):
             self.createArrayCell(i)
         
         # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, "nItems", level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)          
+        self.nItems = self.createIndex(len(self.list), "nItems", level = -1, color = 'black')
 
         # go through each Drawable in the list
         for i, n in enumerate(self.list):
@@ -287,22 +284,16 @@ class OrderedArray(VisualizationApp):
         # Append and draw them to the list and draw them
         for i in a:
             self.list.append(drawable(i))
-        self.display()  
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, 'nItems', level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)           
+        self.display()            
         self.cleanUp(callEnviron)
         
     def newArraySize(self, val):
-        callEnviron = self.createCallEnvironment()                
+        callEnviron = self.createCallEnvironment()  
         # Clear Array and reset size and list
         self.canvas.delete("all")
         self.size = val
-        self.list = []    
-        
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, 'nItems', level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)          
+        self.list = []
+        self.display()
         
         for i in range(val):  # Draw new grid of cells
             self.createArrayCell(i) 
@@ -313,11 +304,7 @@ class OrderedArray(VisualizationApp):
     def find(self, val):
         callEnviron = self.createCallEnvironment()
         self.startAnimations()
-        
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, 'nItems', level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)  
-        
+       
         lo = 0                             #Point to lo
         indexLo = self.createIndex(lo, 'lo',level= 1)
         callEnviron |= set(indexLo)
@@ -353,7 +340,6 @@ class OrderedArray(VisualizationApp):
         self.cleanUp(callEnviron)
         return lo                         #val not found 
     
- 
     removeCode = """
 def delete(self, item):            
     j = self.find(item)             
@@ -362,76 +348,62 @@ def delete(self, item):
         for k in range(j, self.__nItems): 
             self.__a[k] = self.__a[k+1]
         return True                  
- """
+"""
     removeCodeSnippets = {
         'finding_val': ('2.4','2.23'),
-        'key_comparison': ('3.03', '3.45'),
-        'decrement_count': ('4.12','4.end'),
-        'shift_loop_increment': ('5.16','5.44'),
-        'shift_items': ('6.15','6.end'),
-        'success': ('7.12','7.end'),
-    }    
-    
+        'key_comparison': ('3.04', '3.end'),
+        'decrement_count': ('4.8','4.26'),
+        'shift_loop_increment': ('5.8','5.44'),
+        'shift_items': ('6.12','6.end'),
+        'success': ('7.8','7.end')
+    }
+        
     def remove(self, val):
         self.startAnimations()
-        callEnviron = self.createCallEnvironment(
-            self.removeCode.strip(), self.removeCodeSnippets)       
-        
-        # draw an index pointing to the last item in the list
-        indexDisplay = self.createIndex(len(self.list)-1, 'nItems', level = -1, color = 'black')
-        callEnviron |= set(indexDisplay)          
-        
+        callEnviron = self.createCallEnvironment()
+        callEnviron1 = self.createCallEnvironment(
+            self.removeCode.strip(), self.removeCodeSnippets)    
         # show that we are starting the loop
-        self.highlightCodeTags('finding_val', callEnviron)
-        self.wait(0.1)    
+        self.highlightCodeTags('finding_val', callEnviron1)
+        self.wait(0.2) 
         
-        index = self.find(val)   
-        
+        index = self.find(val) 
         found = self.list[index].val == val
         if found:    # Record if value was found
-            self.wait(0.3)
-
+            self.wait(0.2)
             n = self.list[index]
-            
             # if the value is found
-            self.highlightCodeTags('key_comparison', callEnviron)
-            self.wait(0.1)            
-
+            self.highlightCodeTags('key_comparison', callEnviron1)
+            self.wait(0.2)            
             # Slide value rectangle up and off screen
             items = (n.display_shape, n.display_val)
             self.moveItemsOffCanvas(items, N, sleepTime=0.02)
-            
             # decrement nItems
-            self.highlightCodeTags('decrement_count', callEnviron)
-            self.wait(0.3)
-
-            self.highlightCodeTags('shift_loop_increment', callEnviron)
-            self.wait(0.1)            
-
+            self.highlightCodeTags('decrement_count', callEnviron1)
+            self.wait(0.2)
+            self.highlightCodeTags('shift_loop_increment', callEnviron1)
+            self.wait(0.2)            
             # Create an index for shifting the cells
             kIndex = self.createIndex(index, 'k', level = -2)
             callEnviron |= set(kIndex)
-            
             # Slide values from right to left to fill gap
             for i in range(index+1, len(self.list)):
                 self.assignElement(i, i - 1, callEnviron)
-                self.moveItemsBy(kIndex, (self.CELL_SIZE, 0), sleepTime=0.01)
-                
-                self.highlightCodeTags('shift_loop_increment', callEnviron)
-                self.wait(0.1)     
-                
-            self.moveItemsBy(indexDisplay, (-self.CELL_SIZE, 0), sleepTime=0.01)
-            
-            self.highlightCodeTags('success', callEnviron)
+                self.highlightCodeTags('shift_items', callEnviron1)
+                self.wait(0.2)                   
+                self.moveItemsBy(kIndex, (self.CELL_SIZE, 0), sleepTime=0.01) 
+                self.highlightCodeTags('shift_loop_increment', callEnviron1)
+                self.wait(0.2)                   
+            self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0), sleepTime=0.01)
+            self.highlightCodeTags('success', callEnviron1)
             # delete the last cell from the list and as a drawable 
             n = self.list.pop()  
             self.canvas.delete(n.display_shape)
             self.canvas.delete(n.display_val)     
             # update window
-            self.wait(0.3)
-        
+            self.wait(0.2)
         # Animation stops
-        self.highlightCodeTags([], callEnviron)
+        self.highlightCodeTags([], callEnviron1)
         self.cleanUp(callEnviron)
         self.stopAnimations()
         return found
