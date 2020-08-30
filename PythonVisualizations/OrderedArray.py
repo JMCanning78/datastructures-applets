@@ -66,10 +66,37 @@ class OrderedArray(VisualizationApp):
                 font=self.VARIABLE_FONT, fill=color)
         return (arrow, label) if name else (arrow,)
 
-    def insert(self, val):
+    insertCode = """
+def insert(self, item):    # Insert item into the correct position
+    if self.__nItems >= len(self.__a): # If array is full,
+       raise Exception("Array overflow") # raise exception
+    
+    j = self.__nItems       # Start at right (larger) end and loop
+    while 0 < j and self.__a[j - 1] > item: # over items
+       self.__a[j] = self.__a[j-1] # Move larger item to right
+       j -= 1               # Advance left among items
+       
+    self.__a[j] = item      # Insert the item
+    self.__nItems += 1      # Increment the number of items                 
+"""
+    insertCodeSnippets = {
+        'full_array': ('1.4','1.23'),
+        'start': ('4.04', '4.end'),
+        'while_loop':('5.01','5.1'),
+        'make_room': ('6.3','6.38'),
+        'decrement_count': ('7.8','7.44'),
+        'insert_item': ('9.12','9.end'),
+        'increment_items': ('10.8','10.end')
+    }
 
-        callEnviron = self.createCallEnvironment()
+    def insert(self, val):
         self.startAnimations()
+        callEnviron = self.createCallEnvironment()
+        callEnviron1 = self.createCallEnvironment(
+            self.insertCode.strip(), self.insertCodeSnippets)    
+        # show that we are starting the loop
+        self.highlightCodeTags('start', callEnviron1)
+        self.wait(0.2)         
            
        # j = self.find(val)  # Find where item should go
         k=len(self.list)
@@ -79,23 +106,31 @@ class OrderedArray(VisualizationApp):
         callEnviron |= set(indexK)  
 
        # for k in range(len(self.list) - 1, j, -1):  # Move bigger items right
-        while 0 < k and self.list[k-1].val > val: # over items
+        self.highlightCodeTags('while_loop', callEnviron1)
+        self.wait(0.2)         
+        while 0 < k and self.list[k-1].val > val: # over items             
             self.moveItemsBy(indexK, (-self.CELL_SIZE, 0), sleepTime=0.1)  # Move "k" arrow
-
-            self.list[k].val = self.list[k - 1].val # Move larger item to right
-            self.assignElement(k - 1, k, callEnviron)
-            k -= 1  # Advance left among items
+            self.highlightCodeTags('make_room', callEnviron1)
+            self.wait(0.2)  
+            self.list[k].val = self.list[k - 1].val # Move larger item to right            
+            self.assignElement(k - 1, k, callEnviron)          
+            k -= 1  # Advance left among items    
+            self.highlightCodeTags('decrement_count', callEnviron1)
+            self.wait(0.2)                
         # Location of the new cell in the array
         toPositions = (self.cellCoords(k),
                        self.cellCenter(k))
 
+        self.highlightCodeTags('insert_item', callEnviron1)
+        self.wait(0.2)
+        
         # Animate arrival of new value from operations panel area
         canvasDimensions = self.widgetDimensions(self.canvas)
         startPosition = [canvasDimensions[0] // 2, canvasDimensions[1]] * 2
         startPosition = add_vector(startPosition, (0, 0, self.CELL_SIZE, self.CELL_SIZE))
         cellPair = self.createCellValue(startPosition, val)
         callEnviron |= set(cellPair)  # Mark the new items as temporary
-        self.moveItemsTo(cellPair, toPositions, steps= self.CELL_SIZE, sleepTime=0.01)
+        self.moveItemsTo(cellPair, toPositions, steps= self.CELL_SIZE, sleepTime=0.01)          
 
         self.canvas.delete(self.list[k].display_shape)  # These are now covered by the temporary items
         self.canvas.delete(self.list[k].display_val)
