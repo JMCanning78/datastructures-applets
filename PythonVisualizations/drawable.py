@@ -44,6 +44,15 @@ class drawable(object):      # A record describing a drawable Tk object
         
     def _is_valid_operand(self, other): # Check that other is drawable
         return isinstance(other, drawable)
+
+    def __len__(self):
+        return len(self.__fields)
+
+    def __str__(self):
+        return '<drawable: {}>'.format(', '.join(repr(attr) for attr in self))
+        
+    def copy(self):          # Retun a copy of this drawable
+        return drawable(*(attr for attr in self))
     
     palette = ['indianRed2', 'PaleGreen2', 'SkyBlue2', 'orange2',
                'yellow2', 'magenta2', 'cyan2', 'DodgerBlue2',

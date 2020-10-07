@@ -14,33 +14,49 @@ import time, math, operator, re, sys
 from collections import *
 from tkinter import *
 
+try:
+    from coordinates import *
+except ModuleNotFoundError:
+    from .coordinates import *
+    
 # Utilities for vector math; used for canvas item coordinates
+V = vector
 def add_vector(v1, v2):
-    return tuple(map(operator.add, v1, v2))
+    return V(v1) + V(v2)
 
 def subtract_vector(v1, v2):
+    return V(v1) - V(v2)
     return tuple(map(operator.sub, v1, v2))
 
 def divide_vector(v1, v2):   # v2 can be scalar
     if not isinstance(v2, (list, tuple)):
         v2 = [v2] * len(v1)  # Copy scalar value for vector dimension
-    return tuple(map(operator.truediv, v1, v2))
+    return V(v1) / V(v2)
 
 def multiply_vector(v1, v2): # v2 can be scalar
     if not isinstance(v2, (list, tuple)):
         v2 = [v2] * len(v1)  # Copy scalar value for vector dimension
-    return tuple(map(operator.mul, v1, v2))
+    return V(v1) * V(v2)
 
 def rotate_vector(v1, angle=0): # Rotate vector by angle degrees
-    s, c = math.sin(math.radians(angle)), math.cos(math.radians(angle))
-    return (sum(multiply_vector(v1, (c, s))), sum(multiply_vector(v1, (-s, c))))
+    return V(v1).rotate(angle)
 
 def vector_length2(vect):    # Get the vector's length squared
-    return sum(comp * comp for comp in vect)
+    return V(vect).len2()
 
 def vector_length(vect):     # Get the vector's length
-    return math.sqrt(vector_length2(vect))
+    return V(vect).vlen()
 
+def BBoxesOverlap(bbox1, bbox2): # Determine if bounding boxes overlap
+    return (rangesOverlap(bbox1[0], bbox1[2], bbox2[0], bbox2[2]) and 
+            rangesOverlap(bbox1[1], bbox1[3], bbox2[1], bbox2[3]))
+
+def rangesOverlap(           # Determine if a range overlaps another
+        lo1, hi1, lo2, hi2,  # Allow zero overlap, if requested
+        zeroOK=True):
+    return ((hi1 > lo2 or (zeroOK and hi1 == lo2)) and
+            (lo1 < hi2 or (zeroOK and lo1 == hi2)))
+    
 def gridDict(frame):
     slaves = frame.grid_slaves()
     return defaultdict(
@@ -51,9 +67,13 @@ def gridDict(frame):
 
 # Utilities for validating characters typed in Tk entry widgets
 # These must be registered with the parent window before use
-def numericValidate(action, index, value_if_allowed,
-                    prior_value, text, validation_type, trigger_type, widget_name):
+def numericValidate(action, index, value_if_allowed, prior_value, text,
+                    validation_type, trigger_type, widget_name):
     return len(value_if_allowed) == 0 or value_if_allowed.isdigit()
+
+def makeWidthValidate(maxWidth):
+    "Register this with one parameter: %P"
+    return lambda value_if_allowed: len(value_if_allowed) <= maxWidth
 
 geom_delims = re.compile(r'[\sXx+-]')
 
@@ -71,6 +91,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
     OPERATIONS_BG = 'beige'
     OPERATIONS_BORDER = 'black'
     CODE_FONT = ('Courier', 12)
+    SMALL_FONT = ('Helvetica', 9)
     CODE_HIGHLIGHT = 'yellow'
     CONTROLS_FONT = ('Helvetica', 12)
     HINT_FONT = CONTROLS_FONT + ('italic',)
@@ -90,12 +111,14 @@ class VisualizationApp(object):  # Base class for Python visualizations
 
     def __init__(  # Constructor
             self,
-            window=None,  # Run visualization within given window
+            window=None,      # Run visualization within given window
             title=None,
             canvasWidth=800,  # Canvas size
             canvasHeight=400,
-            maxArgWidth=3,  # Maximum length/width of text arguments
+            maxArgWidth=3,    # Maximum length/width of text arguments
+            hoverDelay=1000,  # Milliseconds to wait before showing hints
     ):
+        self.title = title
         # Set up Tk windows for canvas and operational controls
         if window:
             self.window = window
@@ -106,8 +129,9 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.canvas = Canvas(
             self.window, width=canvasWidth, height=canvasHeight)
         self.canvas.pack(expand=True, fill=BOTH)
-        self.setUpControlPanel()
         self.maxArgWidth = maxArgWidth
+        self.HOVER_DELAY = hoverDelay
+        self.setUpControlPanel()
 
         # Set up instance variables for managing animations and operations
         self.callStack = []    # Stack of local environments for visualziation
@@ -158,26 +182,31 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.operationsLowerCenter.grid_columnconfigure(4, minsize=200)
         self.operationsLowerCenter.grid_columnconfigure(3, minsize=10)
 
+    buttonTypes = (Button, Checkbutton, Radiobutton)
+    
     def addOperation(  # Add a button to the operations control panel
-            self,  # The button can depend on N arguments
-            label,  # provided by text entry widgets. Button label
+            self,      # The button can require N arguments provided by text
+            label,     # entry widgets. Button label
             callback,  # Function to call when button pressed
-            numArguments=0,  # Count of required user entered arguments
-            validationCmd=None, # Tk validation command tuple for argument
-            helpText=None,   # Help text for argument (erased on first keypress)
-            maxRows=4,       # Operations w/o args beyond maxRows -> new columns
-            buttonType=Button, # Type can be Button or Checkbutton
+            numArguments=0, # Count of required user entered arguments
+            validationCmd=None, # Tk validation command tuple for argument(s)
+            helpText=None,  # Help text for overall operation
+            argHelpText=[], # Help text for each argument
+            maxRows=4,      # Operations w/o args beyond maxRows -> new columns
+            buttonType=Button, # Type of button (see buttonTypes)
             cleanUpBefore=True, # Clean up all previous animations before Op
             **kwargs):       # Tk button keyword args
         gridItems = gridDict(self.operations) # Operations inserted in grid
         nColumns, nRows = self.operations.grid_size()
         withArgument = [
             gridItems[0, row] for row in range(nRows)
-            if isinstance(gridItems[0, row], (Button, Checkbutton))]
+            if isinstance(gridItems[0, row], self.buttonTypes)]
         withoutArgument = [
             gridItems[col, row]
             for row in range(nRows) for col in range(4, nColumns)
-            if isinstance(gridItems[col, row], (Button, Checkbutton))]
+            if isinstance(gridItems[col, row], self.buttonTypes)]
+        if buttonType not in self.buttonTypes:
+            raise ValueError('Unknown button type: {}'.format(buttonType))
         button = buttonType( # Create button based on type
             self.operations, text=label, font=self.CONTROLS_FONT,
             command=self.runOperation(callback, cleanUpBefore),
@@ -185,25 +214,14 @@ class VisualizationApp(object):  # Base class for Python visualizations
         setattr(button, 'required_args', numArguments)
         if numArguments:
             while len(self.textEntries) < numArguments:  # Build argument entry
-                textEntry = Entry(  # widgets if not already present
-                    self.operations, width=self.maxArgWidth, bg='white',
-                    validate='key', validatecommand=validationCmd,
-                    font=self.CONTROLS_FONT)
-                textEntry.grid(column=2, row=len(self.textEntries) + 1, padx=8)
-                textEntry.bind(
-                    '<KeyRelease>', lambda ev: self.argumentChanged(), '+')
+                textEntry = self.makeArgumentEntry(
+                    validationCmd,
+                    argHelpText[len(self.textEntries)]
+                    if len(argHelpText) > len(self.textEntries) else '')
                 self.textEntries.append(textEntry)
-            if helpText: # Make a label if there a hint on what to enter
-                while self.entryHints: # Remove past hints
-                    self.entryHints.pop().destroy()
-                hint = Label(
-                    self.operations, text=helpText, font=self.HINT_FONT,
-                    fg=self.HINT_FG, bg=self.HINT_BG)
-                hint.bind('<Button>', # Remove the hint when first clicked
-                          deleteHintHandler(hint, self.textEntries[0]))
-                for entry in self.textEntries: # and when entries get focus
-                    entry.bind('<FocusIn>', deleteHintHandler(hint, entry))
-                self.entryHints = [hint]
+                textEntry.grid(column=2, row=len(self.textEntries), padx=8)
+            if argHelpText: # Make a label if there are hints on what to enter
+                self.makeEntryHints(argHelpText[:numArguments])
 
             # Place button in grid of buttons
             buttonRow = len(withArgument) + 1
@@ -237,7 +255,52 @@ class VisualizationApp(object):  # Base class for Python visualizations
             self.opSeparator.grid_configure(
                 rowspan=max(nRows, buttonRow, 
                             self.entryHintRow if self.entryHints else 1))
+        if helpText:
+            button.bind('<Enter>', self.makeArmHintHandler(button, helpText))
+            button.bind('<Leave>', self.makeDisarmHintHandler(button))
+            button.bind('<Button>', self.makeDisarmHintHandler(button), '+')
         return button
+
+    def makeArgumentEntry(self, validationCmd, helpText=''):
+        entry = Entry(
+            self.operations, width=self.maxArgWidth, bg='white',
+            validate='key', validatecommand=validationCmd, 
+            font=self.CONTROLS_FONT)
+        entry.bind(
+            '<KeyRelease>', lambda ev: self.argumentChanged(), '+')
+        if helpText:
+            entry.bind('<Enter>', self.makeArmHintHandler(entry, helpText))
+            entry.bind('<Leave>', self.makeDisarmHintHandler(entry))
+            entry.bind('<KeyRelease>', self.makeDisarmHintHandler(entry), '+')
+        return entry
+
+    def makeEntryHints(self, hints):
+        while self.entryHints: # Remove past hints
+            self.entryHints.pop().destroy()
+        hint = Label(
+            self.operations, text='Click to enter ' + ',\n'.join(hints),
+            font=self.HINT_FONT, fg=self.HINT_FG, bg=self.HINT_BG)
+        hint.bind('<Button>', # Remove the hint when first clicked
+                  deleteInitialHintHandler(hint, self.textEntries[0]))
+        for entry in self.textEntries: # and when entries get focus
+            entry.bind('<FocusIn>', deleteInitialHintHandler(hint, entry))
+        self.entryHints = [hint]
+        
+    def makeArmHintHandler(self, widget, helpText):
+        def handler(event):
+            setattr(widget, 'timeout_ID',
+                    widget.after(
+                        self.HOVER_DELAY, 
+                        lambda: self.setMessage(helpText) or
+                        setattr(widget, 'timeout_ID', None)))
+        return handler
+
+    def makeDisarmHintHandler(self, widget):
+        def handler(event):
+            if event.widget == widget and getattr(widget, 'timeout_ID'):
+                widget.after_cancel(getattr(widget, 'timeout_ID'))
+            setattr(widget, 'timeout_ID', None)
+        return handler
 
     def addAnimationButtons(self):
         self.pauseButton = self.addOperation(
@@ -296,7 +359,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
         gridItems = gridDict(self.operations)  # All operations
         nColumns, nRows = self.operations.grid_size()
         for button in [gridItems[0, row] for row in range(nRows)
-                       if isinstance(gridItems[0, row], (Button, Checkbutton))]:
+                       if isinstance(gridItems[0, row], self.buttonTypes)]:
             nArgs = getattr(button, 'required_args')
             button['state'] = (
                 DISABLED if self.animationState != self.STOPPED or any(
@@ -354,7 +417,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
         codeHighlightBlock = self.getCodeHighlightBlock(callEnviron)
         if codeHighlightBlock is None:  # This shouldn't happen, but...
             return
-        if not isinstance(tags, (list, tuple)):
+        if not isinstance(tags, (list, tuple, set)):
             tags = [tags]
         for tagName in self.codeText.tag_names() if self.codeText else []:
             if not tagName.startswith(codeHighlightBlock.prefix):
@@ -458,7 +521,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             edge=N,          # One of the 4 tkinter edges: N, E, S, or W
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
-        if not isinstance(items, (list, tuple)):
+        if not isinstance(items, (list, tuple, set)):
             items = tuple(items)
         curPositions = [self.canvas.coords(i) for i in items]
         bboxes = [self.canvas.bbox(i) for i in items]
@@ -490,7 +553,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             delta,           # delta vector. items can be 1 item or a list/tuple
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
-        if not isinstance(items, (list, tuple)):
+        if not isinstance(items, (list, tuple, set)):
             items = tuple(items)
         if not isinstance(delta, (list, tuple)) or len(delta) != 2:
             raise ValueError('Delta must be a 2-dimensional vector')
@@ -510,7 +573,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             toPositions,     # items can be a single item or list of items
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
-        if not isinstance(items, (list, tuple)):
+        if not isinstance(items, (list, tuple, set)):
             items = tuple(items)
         if not isinstance(toPositions, (list, tuple)):
             raise ValueError('toPositions must be a list or tuple of positions')
@@ -538,7 +601,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             startAngle=90,   # Starting angle away from destination
             steps=10,        # Number of intermediate steps to reach destination
             sleepTime=0.1):  # Base time between steps (adjusted by user)
-        if not isinstance(items, (list, tuple)):
+        if not isinstance(items, (list, tuple, set)):
             items = tuple(items)
         if not isinstance(toPositions, (list, tuple)):
             raise ValueError('toPositions must be a list or tuple of positions')
@@ -588,7 +651,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             for btn in [gridItems[col, row] for row in range(nRows)]:
                 # Only change button types, not text entry or other widgets
                 # Pause/Stop buttons can only be enabled here
-                if isinstance(btn, (Button, Checkbutton)) and (
+                if isinstance(btn, self.buttonTypes) and (
                         enable or btn not in (self.stopButton, 
                                               self.pauseButton)):
                     btn['state'] = NORMAL if enable else DISABLED
@@ -668,7 +731,7 @@ class UserStop(Exception):   # Exception thrown when user stops animation
 # run a function on each handler ID in the the binding string.
 bindingID = re.compile(r'\d+<lambda>', re.IGNORECASE)
 
-def deleteHintHandler(hint, textEntry):
+def deleteInitialHintHandler(hint, textEntry):
     "Remove a hint when clicked or when text is first entered in textEntry"
     return lambda event: (
         textEntry.focus_set() if event.widget == hint else 0) or (

@@ -20,9 +20,10 @@ class Stack(VisualizationApp):
     STACK_Y0 = 350
 
     def __init__(self, size=MAX_SIZE, maxArgWidth=MAX_ARG_WIDTH, title="Stack", **kwargs):
-        super().__init__(title=title, maxArgWidth=maxArgWidth, **kwargs)
+        kwargs['title'] = title
+        kwargs['maxArgWidth'] = maxArgWidth
+        super().__init__(**kwargs)
         self.size = size
-        self.title = title
         self.list = []
         self.maxArgWidth = maxArgWidth
         self.buttons = self.makeButtons()
@@ -61,12 +62,24 @@ class Stack(VisualizationApp):
 
     # STACK FUNCTIONALITY
 
-    def push(self, val):
+    pushCode = """
+def push(self, item):
+    self.__top += 1
+    self.__stackList[self.__top] = item
+    """
 
+    pushCodeSnippets = {
+        'increment_top':('2.4','2.end'),
+        'add_item':('3.4','3.end')
+    }
+
+    def push(self, val):
         self.startAnimations()
-        callEnviron = self.createCallEnvironment()
+        callEnviron = self.createCallEnvironment(
+            self.pushCode.strip(), self.pushCodeSnippets)
 
         #move arrow up when new cell is inserted
+        self.highlightCodeTags('increment_top', callEnviron)
         self.moveItemsBy(self.indexDisplay, (0, - (self.CELL_HEIGHT)))
 
         cellCoords = self.cellCoords(len(self.list))
@@ -81,6 +94,8 @@ class Stack(VisualizationApp):
         startPosition = add_vector(startPosition, (0, 0, self.CELL_WIDTH, self.CELL_HEIGHT))
         cellPair = self.createCellValue(startPosition, val)
         callEnviron |= set(cellPair)
+
+        self.highlightCodeTags('add_item', callEnviron)
         self.moveItemsTo(cellPair, toPositions, steps=self.CELL_HEIGHT, sleepTime=0.01)
 
         # add a new Drawable with the new value, color, and display objects
@@ -90,7 +105,23 @@ class Stack(VisualizationApp):
         callEnviron ^= set(cellPair)
 
         # finish the animation
+        self.highlightCodeTags([], callEnviron)
         self.cleanUp(callEnviron)
+
+    popCode = """
+def pop(self):
+    top = self.__stackList[self.__top]
+    self.__stackList[self.__top] = None
+    self.__top -= 1
+    return top
+    """
+
+    popCodeSnippets = {
+        'get_top':('2.4','2.end'),
+        'empty_top':('3.4','3.end'),
+        'decrement_top':('4.4', '4.end'),
+        'return_top':('5.4', '5.end'),
+    }
 
     def pop(self):
 
@@ -99,29 +130,41 @@ class Stack(VisualizationApp):
             return
 
         self.startAnimations()
-        callEnviron = self.createCallEnvironment()
+        callEnviron = self.createCallEnvironment(
+            self.popCode.strip(), self.popCodeSnippets)
         n = self.list.pop()
+
+        self.highlightCodeTags('get_top', callEnviron)
 
         # delete the associated display objects
         items = (n.display_shape, n.display_val)
         callEnviron |= set(items)
 
-        # self.moveItemsOffCanvas(items, N, sleepTime=0.02) ## alternative method to moveItemsBy
+        # move item to be deleted to top area
+        shape = self.copyCanvasItem(n.display_shape)
+        val = self.copyCanvasItem(n.display_val)
+        callEnviron |= set((shape, val))
+
+        itemPos = self.topBoxCoords()
+        labelPos = ((itemPos[0] + itemPos[2]) / 2, 
+                    itemPos[1] - self.CELL_HEIGHT / 2)
+
+        topLabel = self.canvas.create_text(
+                *labelPos, text="top", font=self.VARIABLE_FONT,
+                fill=self.VARIABLE_COLOR)
+        callEnviron.add(topLabel)
+
+        self.moveItemsTo([shape, val], (itemPos, (labelPos[0], itemPos[1]+self.CELL_HEIGHT//2)))
+
+        # move item out of stack
+        self.highlightCodeTags('empty_top', callEnviron)
         self.moveItemsBy(items, delta=(0, -max(400, self.canvas.coords(n.display_shape)[3])), steps=self.CELL_HEIGHT, sleepTime=.01)
 
-        # draw an index pointing to the last cell
+        # decrement index pointing to the last cell
+        self.highlightCodeTags('decrement_top', callEnviron)
         self.moveItemsBy(self.indexDisplay, (0, (self.CELL_HEIGHT)))
 
-        # Finish animation
-        self.cleanUp(callEnviron)
-
-        return n.val  # returns value displayed in the cell
-
-    # displays the top val of the stack in a small cell on the bottom right of the window
-    def peek(self):
-        callEnviron = self.createCallEnvironment()
-        self.startAnimations()
-
+        self.highlightCodeTags('return_top', callEnviron)
         # draw output box
         outputBox = self.canvas.create_rectangle(
             self.STACK_X0 + self.CELL_WIDTH * 1.5,
@@ -129,6 +172,61 @@ class Stack(VisualizationApp):
             self.STACK_X0 + self.CELL_WIDTH * 2.5,
             self.STACK_Y0 - self.CELL_HEIGHT,
             fill=self.OPERATIONS_BG)
+        callEnviron.add(outputBox)
+
+        # calculate where the value will need to move to
+        outputBoxCoords = self.canvas.coords(outputBox)
+        midOutputBoxY = (outputBoxCoords[3] + outputBoxCoords[1]) // 2
+        midOutputBoxX = (outputBoxCoords[0] + outputBoxCoords[2]) // 2
+
+        # create the value to move to output box
+        valueOutput = self.copyCanvasItem(val)
+        valueList = (valueOutput,)
+        callEnviron.add(valueOutput)
+
+        # move value to output box
+        toPositions = (midOutputBoxX, midOutputBoxY)
+        self.moveItemsTo(valueList, (toPositions,), sleepTime=.02)
+
+        # make the value 25% smaller
+        newSize = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
+        self.canvas.itemconfig(valueOutput, font=newSize)
+
+        # Finish animation
+        self.highlightCodeTags([], callEnviron)
+        self.cleanUp(callEnviron)
+
+        return n.val  # returns value displayed in the cell
+
+    peekCode = """
+def peek(self):
+    if not self.isEmpty():
+        return self.__stackList[self.__top]
+    """
+
+    peekCodeSnippets = {
+        'check_empty':('2.4','2.end'),
+        'return_top':('3.8','3.end'),
+    }
+
+    # displays the top val of the stack in a small cell on the bottom right of the window
+    def peek(self):
+        self.startAnimations()
+        callEnviron = self.createCallEnvironment(
+            self.peekCode.strip(), self.peekCodeSnippets)
+
+        if self.isEmpty():
+            self.cleanUp(callEnviron)
+            return None
+
+        self.highlightCodeTags('check_empty', callEnviron)
+        self.wait(0.2)
+
+        self.highlightCodeTags('return_top', callEnviron)
+
+        # draw output box
+        outputBox = self.canvas.create_rectangle(
+            *self.outputBoxCoords(), fill=self.OPERATIONS_BG)
         callEnviron.add(outputBox)
 
         pos = len(self.list) - 1
@@ -152,7 +250,21 @@ class Stack(VisualizationApp):
         self.canvas.itemconfig(valueOutput, font=newSize)
 
         # Finish animation
+        self.highlightCodeTags([], callEnviron)
         self.cleanUp(callEnviron)
+
+        return self.list[pos].val
+
+    def outputBoxCoords(self):
+        return (self.STACK_X0 + self.CELL_WIDTH * 1.5,
+                self.STACK_Y0,
+                self.STACK_X0 + self.CELL_WIDTH * 2.5,
+                self.STACK_Y0 - self.CELL_HEIGHT)
+
+    def topBoxCoords(self):
+        outputBox = self.outputBoxCoords()
+        return (outputBox[0], self.CELL_HEIGHT * 2,
+                outputBox[2], self.CELL_HEIGHT * 3)
 
     # lets user input an int argument that determines max size of the stack
     def newStack(self, size):
@@ -163,6 +275,26 @@ class Stack(VisualizationApp):
 
         #make a new arrow pointing to the top of the stack
         self.indexDisplay = self.createIndex(len(self.list)-1)
+
+    isEmptyCode = """
+def isEmpty(self):
+    return self.__top < 0
+    """
+
+    isEmptyCodeSnippets = {
+        'return':('2.4','2.end'),
+    }
+
+    def isEmpty(self):
+        callEnviron = self.createCallEnvironment(
+            self.isEmptyCode.strip(), self.isEmptyCodeSnippets)
+        
+        callEnviron |= set(self.createIndex(-.5, name = "0"))
+        self.highlightCodeTags('return', callEnviron)
+        self.wait(0.3)
+        
+        self.cleanUp(callEnviron)
+        return len(self.list) == 0
 
     def cellCoords(self, cell_index):  # Get bounding rectangle for array cell
         return (self.STACK_X0 + self.CELL_BORDER,
@@ -281,13 +413,10 @@ class Stack(VisualizationApp):
             self.setMessage("Value {} popped!".format(val))
 
     def clickPeek(self):
-
-        if len(self.list) <= 0:
-            self.setMessage("Error! Stack is empty.")
-        else:
-            val = self.list[-1].val
-            self.peek()
-            self.setMessage("Value {} is at the top of the stack!".format(val))
+        val = self.peek()
+        
+        if val: self.setMessage("Value {} is at the top of the stack!".format(val))
+        else: self.setMessage("Error! Stack is empty.")       
 
     def clickNewStack(self):
         val = self.validArgument()

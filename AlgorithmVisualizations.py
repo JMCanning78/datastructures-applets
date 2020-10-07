@@ -6,6 +6,8 @@ This program loads all the visualization modules in a Python package.
 It searches the modules for classes that are subclasses of VisualizationApp 
 and instantiates each one in a separate tab.  When the user clicks on a
 tab, it calls the class's runVisualization method.
+A preferred order for the modules (by class name) controls the order of
+the recognized modules.  The rest are added in alphabetical order.
 """
 
 import argparse, sys, re, webbrowser
@@ -13,6 +15,15 @@ from tkinter import *
 from tkinter import ttk
 from PythonVisualizations import VisualizationApp
 import PythonVisualizations
+
+PREFERRED_ORDER = [
+    'Array', 'OrderedArray', 'SimpleArraySort', 'Stack', 'SimpleQueue',
+    'PriorityQueue', 'PostfixEvaluate', 'LinkedList', 'TowersOfHanoi',
+    'MergeSort', 'AdvancedArraySort', 'BinaryTree', 'Tree234', 'AVLTree',
+    'RedBlackTree', 'Quadtree', 'HashTableOpenAddressing',
+    'HashTableChaining', 'Heap', 'Graph', 'WeightedGraph', 'BloomFilter',
+    'SkipList',
+    ]
 
 def findVisualizations(module, verbose=0):
     classes = []
@@ -23,8 +34,12 @@ def findVisualizations(module, verbose=0):
                 isinstance(getattr(this, 'runVisualization'),
                            type(VisualizationApp.runVisualization)) and
                 this is not VisualizationApp):
+            if verbose > 1:
+                print('Found {}.{}, a subclass of VisualizationApp'.format(
+                    module.__name__, name))
             classes.append(this)
-        elif verbose > 1:
+        elif verbose > 2 or (
+                verbose == 2 and isinstance(this, type(PythonVisualizations))):
             print('Ignoring {}.{} of type {}'.format(
                 module.__name__, name, type(this)), file=sys.stderr)
     return classes
@@ -82,18 +97,32 @@ def showVisualizations(   # Display a set of VisualizationApps in a ttk.Notebook
             frame.pack()
         else:
             ttk.Label(intro, text=line, font=INTRO_FONT).pack()
+    loading = ttk.Label(intro, text='\nLoading ...', 
+                        font=INTRO_FONT + ('italic',))
+    loading.pack()
     notebook.add(intro, state=NORMAL, text='Introduction', padding=8)
-    for app in classes:
-        if verbose > 1:
+    notebook.pack(expand=True, fill=BOTH)
+    notebook.wait_visibility(top)
+
+    classes_dict = dict((app.__name__, app) for app in classes)
+    ordered_classes = [classes_dict[app] for app in PREFERRED_ORDER
+                       if app in classes_dict]
+    ordered_classes += [app for app in classes
+                        if app.__name__ not in PREFERRED_ORDER]
+    
+    for j, app in enumerate(ordered_classes):
+        if verbose > 0:
             print('Found app {} and instantiating'.format(app.__name__),
                   file=sys.stderr)
         pane = ttk.Frame(notebook)
+        loading['text'] = '\nLoading module {} of {} modules...'.format(
+            j + 1, len(classes))
         vizApp = app(window=pane)
         name = getattr(vizApp, 'title', app.__name__)
         notebook.add(pane, text=name)
         if start and start.lower() in (app.__name__.lower(), name.lower()):
             notebook.select(pane)
-    notebook.pack(expand=True, fill=BOTH)
+    loading.destroy()
     top.mainloop()
 
 if __name__ == '__main__':
@@ -113,4 +142,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     showVisualizations(findVisualizations(PythonVisualizations, args.verbose),
-                       start=args.start, title=args.title)
+                       start=args.start, title=args.title, verbose=args.verbose)
