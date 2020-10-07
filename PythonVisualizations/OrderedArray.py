@@ -91,7 +91,6 @@ def insert(self, item):    # Insert item into the correct position
 
     def insert(self, val):
         self.startAnimations()
-
         k=len(self.list)
 
         self.list.append(drawable(None))
