@@ -18,12 +18,10 @@ class SimpleArraySort(VisualizationApp):
     FOUND_COLOR = 'brown4'
     nextColor = 0
     
-   
-
     def __init__(self, size=10, title="Simple Sorting", **kwargs):
-        super().__init__(title=title, **kwargs)
+        kwargs['title'] = title
+        super().__init__(**kwargs)
         self.size = size
-        self.title = title
         self.list = []  # Internal array of drawable cell values
 
         self.buttons = self.makeButtons()

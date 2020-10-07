@@ -91,16 +91,9 @@ def insert(self, item):    # Insert item into the correct position
 
     def insert(self, val):
         self.startAnimations()
-        callEnviron = self.createCallEnvironment()
-        callEnviron1 = self.createCallEnvironment(
-            self.insertCode.strip(), self.insertCodeSnippets)    
-        # show that we are starting the loop
-        self.highlightCodeTags('start', callEnviron1)
-        self.wait(0.2)         
-           
-       # j = self.find(val)  # Find where item should go
         k=len(self.list)
-        self.list.append(drawable(None))       
+
+        self.list.append(drawable(None))
         
         indexK = self.createIndex(len(self.list) -1, 'k', level=-2) # create "k" arrow
         callEnviron |= set(indexK)  
@@ -146,10 +139,10 @@ def insert(self, item):    # Insert item into the correct position
         self.stopAnimations()
         self.cleanUp(callEnviron) 
         
-    def insertBinaryFind(self,val):
+    def insertBinarySearch(self,val):
         callEnviron = self.createCallEnvironment()
         self.startAnimations()
-        j = self.find(val)  # Find where item should go
+        j = self.search(val)  # Find where item should go
 
         self.list.append(drawable(None))
 
@@ -190,11 +183,10 @@ def insert(self, item):    # Insert item into the correct position
         n = self.list.pop()
 
         # delete the associated display objects
-        self.canvas.delete(n.display_shape)
-        self.canvas.delete(n.display_val)
-        
-        #move nItems pointer
-        self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0))
+
+        items = (n.display_shape, n.display_val)
+        callEnviron |= set(items)
+        self.moveItemsOffCanvas(items, N, sleepTime=0.02)
 
         # update window
         self.window.update()
@@ -335,8 +327,9 @@ def insert(self, item):    # Insert item into the correct position
         
         self.window.update()
         self.cleanUp(callEnviron)
+        
+    def search(self, val):
 
-    def find(self, val):
         callEnviron = self.createCallEnvironment()
         self.startAnimations()
        
@@ -352,6 +345,14 @@ def insert(self, item):    # Insert item into the correct position
         while lo <= hi:
             mid = (lo + hi) // 2           # Select the midpoint
             if self.list[mid].val == val:  # Did we find it at midpoint?  
+                posShape = self.canvas.coords(self.list[mid].display_shape)
+
+                # Highlight the found element with a circle
+                callEnviron.add(self.canvas.create_oval(
+                    *add_vector(
+                        posShape,
+                        (self.CELL_BORDER, self.CELL_BORDER, -self.CELL_BORDER, -self.CELL_BORDER)),
+                    outline=self.FOUND_COLOR))
                 self.stopAnimations()
                 self.window.update()
                 return mid                 # Return the value found 
@@ -395,14 +396,8 @@ def delete(self, item):
         
     def remove(self, val):
         self.startAnimations()
-        callEnviron = self.createCallEnvironment()
-        callEnviron1 = self.createCallEnvironment(
-            self.removeCode.strip(), self.removeCodeSnippets)    
-        # show that we are starting the loop
-        self.highlightCodeTags('finding_val', callEnviron1)
-        self.wait(0.2) 
-        
-        index = self.find(val) 
+
+        index = self.search(val)
         found = self.list[index].val == val
         if found:    # Record if value was found
             self.wait(0.2)
@@ -459,8 +454,8 @@ def delete(self, item):
                 '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         newSizeArrayButton = self.addOperation(
             "New", lambda: self.clickNew(), numArguments=1, validationCmd=vcmd)        
-        findButton = self.addOperation(
-            "Find", lambda: self.clickFind(), numArguments=1, validationCmd=vcmd)
+        searchButton = self.addOperation(
+            "Search", lambda: self.clickSearch(), numArguments=1, validationCmd=vcmd)
         randomFillButton = self.addOperation(
             "Random Fill", lambda: self.randomFill())        
         insertButton = self.addOperation(
@@ -471,7 +466,7 @@ def delete(self, item):
             "Delete Rightmost", lambda: self.removeFromEnd())
         #this makes the pause, play and stop buttons 
         self.addAnimationButtons()
-        return [findButton, insertButton, deleteValueButton, newSizeArrayButton, randomFillButton,
+        return [searchButton, insertButton, deleteValueButton, newSizeArrayButton, randomFillButton,
                 deleteRightmostButton]
 
     def validArgument(self):
@@ -482,17 +477,20 @@ def delete(self, item):
                 return val
 
     # Button functions
-    def clickFind(self):       
+
+    def clickSearch(self):
         val = self.validArgument()
         if val is None:
             self.setMessage("Input value must be an integer from 0 to 99.")
         elif len(self.list) == 0: 
             self.setMessage("The array is empty.")
         else:
-            result = self.find(val)
-            if result and result < len(self.list) and self.list[result].val == val:
-                    self.setMessage("Found {}!".format(val))
-            else: self.setMessage("Value {} not found".format(val))
+            result = self.search(val)
+            if self.list[result].val == val:
+                msg = "Found {}!".format(val)
+            else:
+                msg = "Value {} not found".format(val)
+            self.setMessage(msg)
         self.clearArgument()
 
     def clickInsert(self):
@@ -550,3 +548,4 @@ if __name__ == '__main__':
     array = OrderedArray()
 
     array.runVisualization()
+
