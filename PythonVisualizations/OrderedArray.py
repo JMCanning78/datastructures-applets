@@ -335,9 +335,46 @@ def insert(self, item):    # Insert item into the correct position
         for i in range(val):  # Draw new grid of cells
             self.createArrayCell(i) 
         self.cleanUp(callEnviron)
+
+    findCode = """
+def find(self, item):            # Find index at or just below
+      lo = 0                        # item in ordered list
+      hi = self.__nItems-1          # Look between lo and hi
+      
+      while lo <= hi:
+         mid = (lo + hi) // 2       # Select the midpoint
+         if self.__a[mid] == item:  # Did we find it at midpoint?
+            return mid              # Return location of item
+         elif self.__a[mid] < item: # Is item in upper half?
+            lo = mid + 1            # Yes, raise the lo boundary
+         else: 
+            hi = mid - 1            # No, but could be in lower half
+            
+      return lo   # Item not found, return insertion point instead                    
+"""
+    findCodeSnippets = {
+        'initialize_lo': ('2.4','2.end'),
+        'initialize_hi': ('3.04', '3.end'),
+        'while_loop': ('5.04','5.end'),
+        'initialize_mid': ('6.8','6.end'),
+        'found_mid': ('7.8','7.end'),
+        'success': ('8.10','8.end'),
+        'upper_half': ('9.8','9.end'),
+        'move_lo': ('10.8', '10.end'),
+        'lower_half': ('11.8','11.end'),
+        'move_hi': ('12.8','12.end'),
+        'return_lo': ('14.04','14.end'),      
+    }
+
+
     def search(self, val):
-        callEnviron = self.createCallEnvironment()
+        callEnviron = self.createCallEnvironment(
+            self.findCode.strip(), self.findCodeSnippets)     
         self.startAnimations()
+        self.highlightCodeTags('initialize_lo', callEnviron)
+        self.wait(0.3)
+        self.highlightCodeTags('initialize_hi', callEnviron)
+        self.wait(0.3)
         lo = 0                             #Point to lo
         indexLo = self.createIndex(lo, 'lo',level= 1)
         callEnviron |= set(indexLo)
@@ -346,9 +383,15 @@ def insert(self, item):    # Insert item into the correct position
         callEnviron |= set(indexHi)
         mid = (lo + hi) // 2               # Point to the midpoint
         indexMid = self.createIndex(mid, 'mid', level = 2)
-        callEnviron |= set(indexMid)            
+        callEnviron |= set(indexMid)  
+        self.highlightCodeTags('while_loop', callEnviron)
+        self.wait(0.3)
         while lo <= hi:
+            self.highlightCodeTags('initialize_mid', callEnviron)
+            self.wait(0.3)
             mid = (lo + hi) // 2           # Select the midpoint
+            self.highlightCodeTags('found_mid', callEnviron)
+            self.wait(0.3)            
             if self.list[mid].val == val:  # Did we find it at midpoint?  
                 posShape = self.canvas.coords(self.list[mid].display_shape)
 
@@ -363,9 +406,15 @@ def insert(self, item):    # Insert item into the correct position
                 self.wait(0.3)
 
                 self.cleanUp(callEnviron)
+                self.highlightCodeTags('success', callEnviron)
+                self.wait(0.3)                
                 return mid                 # Return the value found 
-        
+            
             elif self.list[mid].val < val: # Is item in upper half?
+                self.highlightCodeTags('upper_half', callEnviron)
+                self.wait(0.3) 
+                self.highlightCodeTags('move_lo', callEnviron)
+                self.wait(0.3)                
                 deltaXLo = (mid - lo) + 1
                 self.moveItemsBy(indexLo, (self.CELL_SIZE*deltaXLo, 0))
                 lo = mid + 1               # Yes, raise the lo boundary
@@ -373,14 +422,19 @@ def insert(self, item):    # Insert item into the correct position
                 self.moveItemsBy(indexMid, (self.CELL_SIZE*deltaXMid, 0))
                
             else:                         # Is item in lower half? 
+                self.highlightCodeTags('lower_half', callEnviron)
+                self.wait(0.3)          
+                self.highlightCodeTags('move_hi', callEnviron)
+                self.wait(0.3)                
                 deltaXHi = (mid -hi) - 1 
                 self.moveItemsBy(indexHi, (self.CELL_SIZE*deltaXHi, 0))
                 hi = mid - 1              # Yes, lower the hi boundary 
                 deltaXMid = ((lo- hi) //2) -1
                 self.moveItemsBy(indexMid, (self.CELL_SIZE* deltaXMid, 0))
-        
-        #self.window.update()
-        #self.stopAnimations()
+        self.highlightCodeTags('return_lo', callEnviron)
+        self.wait(0.3)        
+        self.window.update()
+        self.stopAnimations()
         self.cleanUp(callEnviron)
         return lo                       #val not found 
     
@@ -403,11 +457,13 @@ def delete(self, item):
     }
         
     def remove(self, val):
+        self.startAnimations()
+        
         #callEnviron = self.createCallEnvironment()   
         callEnviron = self.createCallEnvironment(
             self.removeCode.strip(), self.removeCodeSnippets)  
         
-        self.startAnimations()
+        self.highlightCodeTags('finding_val', callEnviron)
 
         index = self.search(val)
         
@@ -428,12 +484,13 @@ def delete(self, item):
             
             # decrement nItems
             self.highlightCodeTags('decrement_count', callEnviron)
-            self.wait(0.2)
-            self.highlightCodeTags('shift_loop_increment', callEnviron)
-            self.wait(0.2)         
+            self.wait(0.2)       
 
             #decrement nItems pointer  
             self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0), sleepTime=0.01)
+            
+            self.highlightCodeTags('shift_loop_increment', callEnviron)
+            self.wait(0.2)              
             
             # Create an index for shifting the cells
             kIndex = self.createIndex(index, 'k', level = -2)
