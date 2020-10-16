@@ -40,7 +40,7 @@ class BinaryTree(BinaryTreeBase):
 
     # find node with given key k
     # return the associated data or None
-    def find(self, key):
+    def find(self, key, stopAnimations=True):
         if self.size == 0: return None, None
 
         callEnviron = self.createCallEnvironment()
@@ -63,7 +63,7 @@ class BinaryTree(BinaryTreeBase):
             if cur.getKey() == key:
                 callEnviron.add(self.createHighlightedValue(cur))
                 self.wait(0.2)
-                self.cleanUp(callEnviron)
+                self.cleanUp(callEnviron, stopAnimations=stopAnimations)
                 return cur, parent
 
             parent = cur
@@ -75,7 +75,7 @@ class BinaryTree(BinaryTreeBase):
             else:
                 cur = self.getRightChild(cur)
             
-        self.cleanUp(callEnviron)
+        self.cleanUp(callEnviron, stopAnimations=stopAnimations)
         return None, None
 
     def insertElem(self, key, animation=True):
@@ -148,104 +148,63 @@ class BinaryTree(BinaryTreeBase):
         return True
 
     def delete(self, key):
-        # find the node with the key
-         cur, parent = self.find(key)
-
-        # node with key does not exist
-         if not cur: return None
-
-        # go through the process of deleting the item
-         return self.__delete(parent, cur)
-        
-    def __delete(self, parent, cur):
-        # get rid of the highlighted value
-        self.cleanUp()
-
         # create a call environment and start the animations
         callEnviron = self.createCallEnvironment()
         self.startAnimations()
+
+        # find the node with the key
+        cur, parent = self.find(key, stopAnimations=False)
+
+        # node with key does not exist
+        if not cur: 
+            result = None
+            self.stopAnimations()
+        else:
+            # go through the process of deleting the item
+            result = self.__delete(cur, callEnviron)
+        self.cleanUp(callEnviron)
+        return result
+        
+    def __delete(self, cur, callEnviron):
 
         #save the deleted key and its index
         deleted = cur.getKey()
         
         #determine the correct process for removing the node from the tree
         if self.getLeftChild(cur):
-            if self.getRightChild(cur):                                             # cur has left and right child                                             
+            if self.getRightChild(cur):    # cur has left and right child
                 self.__promoteSuccessor(cur, callEnviron)
-            else:                                                                   # cur only has left child
+                self.removeNodeDrawing(cur) # Remove deleted node's canvas items
+            else:                          # cur only has left child
+                self.removeNodeDrawing(cur) # Remove deleted node's canvas items
                 # get cur's left child that will be moving up
                 curLeft = self.getLeftChild(cur)
-                # get cur's grandchildren (or cur's left child's children)
-                # so we can reattach them after moving cur's left up
-                curLeftChildren = self.getChildren(curLeft)
-
-                if self.isRoot(cur):                                                # delete the root that only has left child
-                    self.removeAndReconnectNodes(cur, parent, 
-                                            self.setRoot, 
-                                            curLeft, curLeftChildren)
-
-                elif self.isLeftChild(cur):                                         #parent's left is cur, cur only has a left
-                    self.removeAndReconnectNodes(cur, parent, 
-                                            self.setLeftChild, 
-                                            curLeft, curLeftChildren)
-
-                else:                                                               #parent's right is cur, cur only has a left
-                    self.removeAndReconnectNodes(cur, parent, 
-                                            self.setRightChild, 
-                                            curLeft, curLeftChildren)
-                self.removeNodeDrawing(cur)  
-        else:                                                                       #a right child exists or no children
+                # remove current and promote left child
+                self.removeAndReconnectNodes(cur, curLeft)
+        else:                        # a right child exists or no children
+            self.removeNodeDrawing(cur)  # Remove deleted node's canvas items
             # get cur's right child that will be moving up
             curRight = self.getRightChild(cur)
-            # get cur's grandchildren (or cur's right child's children)
-            # so we can reattach them after moving cur's right up
-            curRightChildren = self.getChildren(curRight)
+            # remove current and promote right child
+            self.removeAndReconnectNodes(cur, curRight)
 
-            if self.isRoot(cur):                                                    # deleting the root
-                self.removeAndReconnectNodes(cur, parent, 
-                                            self.setRoot, 
-                                            curRight, curRightChildren)
-
-            elif self.isLeftChild(cur):                                             #parent's left is cur, cur has a right child / no child
-                self.removeAndReconnectNodes(cur, parent, 
-                                            self.setLeftChild, 
-                                            curRight, curRightChildren)
-
-            else:                                                                   #parent's right is cur, cur has a right child / no child
-                self.removeAndReconnectNodes(cur, parent, 
-                                            self.setRightChild, 
-                                            curRight, curRightChildren)
-            
-            self.removeNodeDrawing(cur)
-
-        self.cleanUp(callEnviron)
         return deleted
+        
+    def removeAndReconnectNodes(self, cur, curRightOrLeft):
+        
+        # 1. Note the indices of the current node and the child to move up
+        curIndex, childIndex = self.getIndex(cur), self.getIndex(curRightOrLeft)
 
-    def reconnect(self, node, leftChild, rightChild):
-        if not node: return
-        # save each of their children before reconnecting with parent
-        leftChildren = self.getChildren(leftChild)
-        rightChildren = self.getChildren(rightChild)
-
-        # reconnect the children with their parent
-        self.setLeftChild(node, leftChild)
-        self.setRightChild(node, rightChild)
-
-        # reconnect the children of the left child
-        self.reconnect(leftChild, *leftChildren)
-        # reconnect the children of the right child
-        self.reconnect(rightChild, *rightChildren)
-    
-    def removeAndReconnectNodes(self, cur, parent, commandToSetChild, curRightOrLeft, curRightOrLeftChildren):
-        # 1. delete the key
+        # 2. delete the key and line to its parent 
+        line = self.getLine(cur)
+        if line:
+            self.canvas.delete(line)
+        elif curRightOrLeft and self.getLine(curRightOrLeft):
+            self.canvas.delete(self.getLine(curRightOrLeft))
         self.removeNodeInternal(cur)
 
-        # 2. move cur's right/left up
-        if commandToSetChild != self.setRoot: commandToSetChild(parent, curRightOrLeft)
-        else: commandToSetChild(curRightOrLeft)
-
-        # 3. reconnect cur's right/left and its children
-        self.reconnect(curRightOrLeft, *curRightOrLeftChildren)
+        # 3. move child subtree to be rooted at current node
+        self.moveSubtree(curIndex, childIndex)
 
         # 4. move cur's right/left and its children up in the drawing
         #does cur have children?
@@ -270,11 +229,13 @@ class BinaryTree(BinaryTreeBase):
             self.createHighlightedLine(successor, callEnviron=callEnviron)
 
         self.wait(0.2)
-        self.createHighlightedCircle(successor, callEnviron=callEnviron)
+        highlight = self.createHighlightedCircle(
+            successor, callEnviron=callEnviron)
 
         # replace node to delete with successor's key and data
         newSuccessor = self.copyNode(successor)
-        callEnviron |= set((newSuccessor,))
+        callEnviron |= set((newSuccessor.drawable.display_shape,
+                            newSuccessor.drawable.display_val))
         
         # a. internal replacement
         newSuccessor.coords = node.coords
@@ -282,13 +243,15 @@ class BinaryTree(BinaryTreeBase):
         self.nodes[deletedIndex] = newSuccessor
         
         # b. drawing replacement
-        self.restoreNodesPosition((newSuccessor,))
-        callEnviron.remove(newSuccessor)
+        self.restoreNodesPosition((newSuccessor,), includeLines=False)
+        callEnviron -= set((newSuccessor.drawable.display_shape,
+                            newSuccessor.drawable.display_val))
         self.removeNodeDrawing(node)
+        self.canvas.delete(highlight)
+        callEnviron.discard(highlight)
 
         # remove successor node
-        if parent is node: parent = newSuccessor
-        self.__delete(parent, successor)
+        self.__delete(successor, callEnviron)
 
     def validArgument(self):
         entered_text = self.getArgument()
@@ -335,12 +298,13 @@ class BinaryTree(BinaryTreeBase):
         val = self.validArgument()
         if val < 100:
             deleted = tree.delete(val)
-            msg = "Deleted!" if deleted else "Value not found"
+            msg = ("Deleted {}".format(val) if deleted else
+                   "Value {} not found".format(val))
         else:
             msg = "Input value must be an integer from 0 to 99."
         self.setMessage(msg)
         self.clearArgument()
-
+        
     def makeButtons(self):
         vcmd = (self.window.register(numericValidate),
                 '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')

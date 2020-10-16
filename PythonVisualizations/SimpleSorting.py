@@ -17,18 +17,21 @@ class SimpleArraySort(VisualizationApp):
     ARRAY_Y0 = 100
     FOUND_COLOR = 'brown4'
     nextColor = 0
+
     
     def __init__(self, size=10, title="Simple Sorting", **kwargs):
         kwargs['title'] = title
         super().__init__(**kwargs)
         self.size = size
         self.list = []  # Internal array of drawable cell values
+        self.nItems = 0
 
         self.buttons = self.makeButtons()
         for i in range(size):
-            self.list.append(drawable(random.randrange(30)))
+            self.list.append(drawable(random.randrange(30))) 
+                
         self.display()
-
+        
     def __str__(self):
         return str(self.list)
 
@@ -184,10 +187,7 @@ def insert(self, item):
             self.size += 1
             self.createArrayCell(len(self.list))
 
-        # draw an index pointing to the last cell
         self.highlightCodeTags('item_assignment', callEnviron)
-        indexDisplay = self.createIndex(len(self.list), 'nItems')
-        callEnviron |= set(indexDisplay)
 
         # create new cell and cell value display objects
         toPositions = (self.cellCoords(len(self.list)),
@@ -203,34 +203,35 @@ def insert(self, item):
         self.moveItemsTo(cellPair, toPositions, steps=self.CELL_SIZE, sleepTime=0.01)
 
         # add a new Drawable with the new value, color, and display objects
-        self.list.append(drawable(
-            val, self.canvas.itemconfigure(cellPair[0], 'fill'), *cellPair))
+        self.list.append(drawable(val, self.canvas.itemconfigure(cellPair[0], 'fill') [-1], *cellPair))
         callEnviron ^= set(cellPair) # Remove new cell from temp call environ
 
         # advance index for next insert
         self.highlightCodeTags('nitem_increment', callEnviron)
-        self.moveItemsBy(indexDisplay, (self.CELL_SIZE, 0), sleepTime=0.01)
+        self.moveItemsBy(self.nItems, (self.CELL_SIZE, 0), sleepTime=0.01)
 
         self.highlightCodeTags([], callEnviron)
         self.cleanUp(callEnviron)
 
     def removeFromEnd(self):
+        
+        # pop a Drawable from the list
         if len(self.list) == 0:
             self.setMessage('Array is empty!')
-            return
+            return        
+        callEnviron = self.createCallEnvironment()        
 
-        self.startAnimations()
-        callEnviron = self.createCallEnvironment()
+        self.startAnimations() 
         
-        # pop an Element from the list
-        n = self.list.pop()
+        # advance index for next insert
+        self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0))              
         
-        # Slide value rectangle up and off screen
+        n = self.list.pop()  
         items = (n.display_shape, n.display_val)
         callEnviron |= set(items)
         self.moveItemsOffCanvas(items, N, sleepTime=0.02)
 
-        # Finish animation
+        # Clean up temporary items
         self.cleanUp(callEnviron)
 
     def cellCoords(self, cell_index):  # Get bounding rectangle for array cell
@@ -290,15 +291,19 @@ def insert(self, item):
 
         for i in range(self.size):  # Draw grid of cells
             self.createArrayCell(i)
+        
+        #draw an index pointing to the last item in the list 
+        self.nItems = self.createIndex(len(self.list), 'nItems', level = -1, color = 'black')
 
         # go through each Drawable in the list
         for i, n in enumerate(self.list):
             # create display objects for the associated Drawables
             n.display_shape, n.display_val = self.createCellValue(
                 i, n.val, n.color)
-            n.color = self.canvas.itemconfigure(n.display_shape, 'fill')
+            n.color = self.canvas.itemconfigure(n.display_shape, 'fill')[-1]
 
         self.window.update()
+        
 
     findCode = """
 def find(self, item):
@@ -440,12 +445,12 @@ def insertionSort(self):
 
         # make an index arrow for the outer loop
         outer = 1
-        outerIndex = self.createIndex(outer, "outer", level=-2)
+        outerIndex = self.createIndex(outer, "outer", level=-3)
         callEnviron |= set(outerIndex)
         self.highlightCodeTags('outer_loop_increment', callEnviron)
 
         # make an index arrow that points to the next cell to check
-        innerIndex = self.createIndex(outer, "inner", level=-1)
+        innerIndex = self.createIndex(outer, "inner", level=-2)
         callEnviron |= set(innerIndex)
         tempVal, label = None, None
 
@@ -602,7 +607,7 @@ def selectionSort(self):
         callEnviron = self.createCallEnvironment(
             SimpleArraySort.selectionSortCode.strip(),
             self.selectionSortCodeSnippets)
-        n = len(self.list)
+        n = len(self.list)      
 
         # make an index arrow for the outer loop
         outer = 0

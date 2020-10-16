@@ -90,7 +90,9 @@ def insert(self, item):    # Insert item into the correct position
     }
 
     def insert(self, val):
+        callEnviron = self.createCallEnvironment()
         self.startAnimations()
+
         k=len(self.list)
 
         self.list.append(drawable(None))
@@ -99,9 +101,8 @@ def insert(self, item):    # Insert item into the correct position
         callEnviron |= set(indexK)  
 
        # for k in range(len(self.list) - 1, j, -1):  # Move bigger items right
-        self.highlightCodeTags('while_loop', callEnviron1)
-        self.wait(0.2)         
-        while 0 < k and self.list[k-1].val > val: # over items             
+
+        while 0 < k and self.list[k-1].val > val: # over items:
             self.moveItemsBy(indexK, (-self.CELL_SIZE, 0), sleepTime=0.1)  # Move "k" arrow
             self.highlightCodeTags('make_room', callEnviron1)
             self.wait(0.2)  
@@ -123,7 +124,7 @@ def insert(self, item):    # Insert item into the correct position
         startPosition = add_vector(startPosition, (0, 0, self.CELL_SIZE, self.CELL_SIZE))
         cellPair = self.createCellValue(startPosition, val)
         callEnviron |= set(cellPair)  # Mark the new items as temporary
-        self.moveItemsTo(cellPair, toPositions, steps= self.CELL_SIZE, sleepTime=0.01)          
+        self.moveItemsTo(cellPair, toPositions, steps= self.CELL_SIZE, sleepTime=0.01)
 
         self.canvas.delete(self.list[k].display_shape)  # These are now covered by the temporary items
         self.canvas.delete(self.list[k].display_val)
@@ -135,8 +136,6 @@ def insert(self, item):    # Insert item into the correct position
         self.moveItemsBy(self.nItems, (self.CELL_SIZE, 0))
         self.wait(0.1)        
 
-        self.window.update()  
-        self.stopAnimations()
         self.cleanUp(callEnviron) 
         
     def insertBinarySearch(self,val):
@@ -169,17 +168,20 @@ def insert(self, item):    # Insert item into the correct position
         self.list[j] = (drawable(
             val, self.canvas.itemconfigure(cellPair[0], 'fill')[-1], *cellPair))
 
-        self.window.update()
         self.cleanUp(callEnviron)
-        self.stopAnimations()
+
     def removeFromEnd(self):
-        callEnviron = self.createCallEnvironment()         
-        
         # pop a Drawable from the list
         if len(self.list) == 0:
             self.setMessage('Array is empty!')
             return
-        self.startAnimations()        
+        callEnviron = self.createCallEnvironment()         
+        
+        self.startAnimations()  
+   
+        #move nItems pointer
+        self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0))
+        
         n = self.list.pop()
 
         # delete the associated display objects
@@ -188,9 +190,7 @@ def insert(self, item):    # Insert item into the correct position
         callEnviron |= set(items)
         self.moveItemsOffCanvas(items, N, sleepTime=0.02)
 
-        # update window
-        self.window.update()
-        self.stopAnimations()
+        # Clean up animations
         self.cleanUp(callEnviron)
         
     def assignElement(
@@ -321,15 +321,10 @@ def insert(self, item):    # Insert item into the correct position
         self.size = val
         self.list = []
         self.display()
-        
-        for i in range(val):  # Draw new grid of cells
-            self.createArrayCell(i) 
-        
-        self.window.update()
+
         self.cleanUp(callEnviron)
         
     def search(self, val):
-
         callEnviron = self.createCallEnvironment()
         self.startAnimations()
        
@@ -348,13 +343,16 @@ def insert(self, item):    # Insert item into the correct position
                 posShape = self.canvas.coords(self.list[mid].display_shape)
 
                 # Highlight the found element with a circle
-                callEnviron.add(self.canvas.create_oval(
+                foundCircle = self.canvas.create_oval(
                     *add_vector(
                         posShape,
                         (self.CELL_BORDER, self.CELL_BORDER, -self.CELL_BORDER, -self.CELL_BORDER)),
-                    outline=self.FOUND_COLOR))
-                self.stopAnimations()
-                self.window.update()
+                    outline=self.FOUND_COLOR)
+                callEnviron.add(foundCircle) 
+                
+                self.wait(0.3)
+
+                self.cleanUp(callEnviron)
                 return mid                 # Return the value found 
         
             elif self.list[mid].val < val: # Is item in upper half?
@@ -370,9 +368,7 @@ def insert(self, item):    # Insert item into the correct position
                 hi = mid - 1              # Yes, lower the hi boundary 
                 deltaXMid = ((lo- hi) //2) -1
                 self.moveItemsBy(indexMid, (self.CELL_SIZE* deltaXMid, 0))
-        
-        self.window.update()
-        self.stopAnimations()
+                
         self.cleanUp(callEnviron)
         return lo                         #val not found 
     
@@ -395,45 +391,38 @@ def delete(self, item):
     }
         
     def remove(self, val):
+        callEnviron = self.createCallEnvironment()         
         self.startAnimations()
 
         index = self.search(val)
+        
         found = self.list[index].val == val
         if found:    # Record if value was found
-            self.wait(0.2)
             n = self.list[index]
             # if the value is found
             self.highlightCodeTags('key_comparison', callEnviron1)
             self.wait(0.2)            
             # Slide value rectangle up and off screen
             items = (n.display_shape, n.display_val)
-            self.moveItemsOffCanvas(items, N, sleepTime=0.02)
-            # decrement nItems
-            self.highlightCodeTags('decrement_count', callEnviron1)
-            self.wait(0.2)
-            self.highlightCodeTags('shift_loop_increment', callEnviron1)
-            self.wait(0.2)            
+            self.moveItemsOffCanvas(items, N, sleepTime=0.01)
+            callEnviron |= set(items)
+
+            #decrement nItems pointer  
+            self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0), sleepTime=0.01)
+            
             # Create an index for shifting the cells
             kIndex = self.createIndex(index, 'k', level = -2)
             callEnviron |= set(kIndex)
             # Slide values from right to left to fill gap
             for i in range(index+1, len(self.list)):
                 self.assignElement(i, i - 1, callEnviron)
-                self.highlightCodeTags('shift_items', callEnviron1)
-                self.wait(0.2)                   
-                self.moveItemsBy(kIndex, (self.CELL_SIZE, 0), sleepTime=0.01) 
-                self.highlightCodeTags('shift_loop_increment', callEnviron1)
-                self.wait(0.2)                   
-            self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0), sleepTime=0.01)
-            self.highlightCodeTags('success', callEnviron1)
-            # delete the last cell from the list and as a drawable 
-            n = self.list.pop()  
+                self.moveItemsBy(kIndex, (self.CELL_SIZE, 0), sleepTime=0.01)
+    
+            # delete the last, duplicate cell from the list and as a drawable 
+            n = self.list.pop()
             self.canvas.delete(n.display_shape)
             self.canvas.delete(n.display_val)     
-            # update window
-            self.wait(0.2)
-        # Animation stops
-        self.highlightCodeTags([], callEnviron1)
+
         self.cleanUp(callEnviron)
         self.stopAnimations()
         return found
@@ -475,7 +464,7 @@ def delete(self, item):
             val = int(entered_text)
             if val < 100:
                 return val
-
+            
     # Button functions
     def clickSearch(self):
         val = self.validArgument()
@@ -527,20 +516,6 @@ def delete(self, item):
         else:
             self.newArraySize(val)        
         self.clearArgument()    
-
-    def enableButtons(self, enable=True):
-        for btn in self.buttons:
-            btn.config(state=NORMAL if enable else DISABLED)    
-    
-    def startAnimations(self):
-        self.enableButtons(enable=False)
-        super().startAnimations()
-            
-    def stopAnimations(self):
-        super().stopAnimations()
-        self.enableButtons(enable=True)
-        self.argumentChanged()    
-
 
 if __name__ == '__main__':
     random.seed(3.14159)  # Use fixed seed for testing consistency

@@ -130,23 +130,26 @@ class VisualizationApp(object):  # Base class for Python visualizations
             self.window, width=canvasWidth, height=canvasHeight)
         self.canvas.pack(expand=True, fill=BOTH)
         self.maxArgWidth = maxArgWidth
+
         self.HOVER_DELAY = hoverDelay
         self.setUpControlPanel()
+        self.minCodeCharacterWidth = 20
+        self.minCodeCharacterHeight = 12
 
         # Set up instance variables for managing animations and operations
         self.callStack = []    # Stack of local environments for visualziation
         self.animationState = self.STOPPED
         self.pauseButton, self.stopButton = None, None
-        
+ 
     def setUpControlPanel(self):  # Set up control panel structure
         self.controlPanel = Frame(self.window)
-        self.controlPanel.pack(side=BOTTOM, fill=X)
+        self.controlPanel.pack(side=BOTTOM, expand=True, fill=X)
         self.operationsUpper = LabelFrame(self.controlPanel, text="Operations")
         self.operationsUpper.grid(row=0, column=0)
-        self.operationsBorder = Frame(
+        self.operationsPadding = Frame(
             self.operationsUpper, padx=2, pady=2, bg=self.OPERATIONS_BORDER)
-        self.operationsBorder.pack(side=TOP)
-        self.operations = Frame(self.operationsBorder, bg=self.OPERATIONS_BG)
+        self.operationsPadding.pack(side=TOP)
+        self.operations = Frame(self.operationsPadding, bg=self.OPERATIONS_BG)
         self.opSeparator = None
         self.operations.pack(side=LEFT)
         self.operationsLower = Frame(self.controlPanel)
@@ -379,7 +382,9 @@ class VisualizationApp(object):  # Base class for Python visualizations
         if self.codeText is None:
             self.codeText = Text(
                 self.codeFrame, wrap=NONE, background=self.OPERATIONS_BG,
-                font=self.CODE_FONT, width=40, height=12, padx=10, pady=10,
+
+                font=self.CODE_FONT, width=42,
+                height=self.minCodeCharacterHeight, padx=10, pady=10,
                 takefocus=False)
             self.codeText.grid(row=0, column=0, sticky=(N, E, S, W))
             self.codeVScroll = Scrollbar(
@@ -390,6 +395,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
             self.codeHScroll.grid(row=1, column=0, sticky=(E, W))
             self.codeText['xscrollcommand'] = self.codeHScroll.set
             self.codeText['yscrollcommand'] = self.codeVScroll.set
+            self.controlPanel.bind('<Configure>', self.resizeCodeText)
             self.codeText.tag_config('call_stack_boundary',
                                      font=self.CODE_FONT + ('overstrike',),
                                      background=self.CALL_STACK_BOUNDARY)
@@ -407,11 +413,29 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.codeText.insert('1.0', code + '\n')
         self.codeText.see('1.0')
         self.window.update()
+        self.resizeCodeText()
        
         # Tag the snippets with unique tag name
         for tagName in snippets:
             self.codeText.tag_add(prefix + tagName, *snippets[tagName])
         self.codeText.configure(state=DISABLED)
+
+
+    def resizeCodeText(self, event=None):
+        if self.codeText and self.codeText.winfo_ismapped():
+            ct = self.codeText
+            nCharsWide = ct['width']
+            padX = ct['padx']
+            available = (self.controlPanel.winfo_width() -
+                     max(self.operationsUpper.winfo_width(),
+                         self.operationsLower.winfo_width()) -
+                          self.codeVScroll.winfo_width() - padX - padX)
+            ctWidth = ct.winfo_width()
+            widthPerChar = (ctWidth - padX) / nCharsWide
+            desired = max(self.minCodeCharacterWidth, 
+                          round(available / widthPerChar))
+            if desired != nCharsWide:
+                ct['width'] = desired
 
     def highlightCodeTags(self, tags, callEnviron):
         codeHighlightBlock = self.getCodeHighlightBlock(callEnviron)
@@ -516,13 +540,40 @@ class VisualizationApp(object):  # Base class for Python visualizations
                                  self.canvas.tag_bind(canvasitem, eventType))
         return newItem
 
+    #####################################################################
+    #                                                                   #
+    #                       Animation Methods                           #
+    #                                                                   #
+    #####################################################################
+    # These methods animate canvas items moving in increments with an
+    # adjustable speed.  The items are moved together as a group.
+    # They take differing paths to get to their destinations.  The
+    # items parameter for each method can be either a single item ID
+    # or tag, or a list|tuple|set of IDs or tags. The steps parameter
+    # specifies how many incremental steps should be taken in
+    # completing the movement and must be 1 or more.  The sleepTime
+    # specifies how long to wait between incremental steps.  A
+    # sleepTime of 0 will produce the fastest steps, but you may not
+    # see the intermediate positions of the items.  Each moveItems____
+    # method calls a generator called moveItems____Sequence that
+    # iterates over the steps yielding the step from 0 up to steps-1
+    # and the total number of steps (some methods my change the number
+    # of steps) This enables combining animation sequences by using
+    # the *Sequence generator to go through the steps and performing
+    # other animation actions for each step.
+
     def moveItemsOffCanvas(  # Animate the removal of canvas items by sliding
             self, items,     # them off one of the canvas edges
             edge=N,          # One of the 4 tkinter edges: N, E, S, or W
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
+        for step, _ in self.moveItemsOffCanvasSequence(items, edge, steps):
+            self.wait(sleepTime)
+
+    def moveItemsOffCanvasSequence(  # Iterator for moveItemsOffCanvas
+            self, items, edge=N, steps=10):
         if not isinstance(items, (list, tuple, set)):
-            items = tuple(items)
+            items = (items,)
         curPositions = [self.canvas.coords(i) for i in items]
         bboxes = [self.canvas.bbox(i) for i in items]
         bbox = bboxes[0]  # Get bounding box of all items
@@ -546,15 +597,21 @@ class VisualizationApp(object):  # Base class for Python visualizations
             delta = (abs(delta[1]) * (-1 if delta[0] < 0 else 1), delta[1])
         elif abs(delta[0]) < abs(delta[1]) and edge not in (N, S):
             delta = (delta[0], abs(delta[0]) * (-1 if delta[1] < 0 else 1))
-        self.moveItemsBy(items, delta, steps=steps, sleepTime=sleepTime)
+        for step, _ in self.moveItemsBySequence(items, delta, steps):
+            yield (step, _)
 
     def moveItemsBy(         # Animate canvas items moving from their current
             self, items,     # location in a direction indicated by a single
             delta,           # delta vector. items can be 1 item or a list/tuple
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
+        for step, _ in self.moveItemsBySequence(items, delta, steps):
+            self.wait(sleepTime)
+
+    def moveItemsBySequence( # Iterator for moveItemsBy
+            self, items, delta, steps=10):
         if not isinstance(items, (list, tuple, set)):
-            items = tuple(items)
+            items = (items,)
         if not isinstance(delta, (list, tuple)) or len(delta) != 2:
             raise ValueError('Delta must be a 2-dimensional vector')
         if vector_length2(delta) < 0.001: # If delta is tiny
@@ -566,19 +623,26 @@ class VisualizationApp(object):  # Base class for Python visualizations
         for step in range(steps):
             for item in items:
                 self.canvas.move(item, *moveBy)
-            self.wait(sleepTime)
+            yield (step, steps) # Yield step in sequence
 
-    def moveItemsTo(         # Animate canvas items moving from their current
-            self, items,     # location to destination locations along line(s)
+    def moveItemsTo(         # Animate canvas items moving rigidly 
+            self, items,     # to destination locations along line(s)
             toPositions,     # items can be a single item or list of items
             steps=10,        # Number of intermediate steps along line
             sleepTime=0.1):  # Base time between steps (adjusted by user)
+        for step, _ in self.moveItemsToSequence(items, toPositions, steps):
+            self.wait(sleepTime)
+
+    def moveItemsToSequence( # Iterator for moveItemsTo
+            self, items,     # to destination locations along line(s)
+            toPositions,     # items can be a single item or list of items
+            steps=10):
         if not isinstance(items, (list, tuple, set)):
-            items = tuple(items)
+            items = (items,)
         if not isinstance(toPositions, (list, tuple)):
             raise ValueError('toPositions must be a list or tuple of positions')
         if not isinstance(toPositions[0], (list, tuple)):
-            toPositions = tuple(toPositions)
+            toPositions = (toPositions,)
         steps = max(1, steps) # Must use at least 1 step
         moveBy = [divide_vector(subtract_vector(toPos, fromPos), steps)
                   for toPos, fromPos in zip(
@@ -589,18 +653,66 @@ class VisualizationApp(object):  # Base class for Python visualizations
         for step in range(steps):
             for i, item in enumerate(items):
                 self.canvas.move(item, *moveBy[i])
-            self.wait(sleepTime)
+            yield (step, steps) # Yield step in sequence
             
         # Force position of new objects to their exact destinations
         for pos, item in zip(toPositions, items):
             self.canvas.coords(item, *pos)
 
+    # The moveItemsLinearly method uses all the coordinates of canvas
+    # items in calculating the movement vectors.  Don't pass the
+    # 'items' arguments with canvas tags attached to multiple items.
+    # If you do, it will only move one of them and the number of
+    # coordinates for it the toPositions argument could be a mismatch.
+    # Pass item IDs to ensure a 1-to-1 mapping.
+    def moveItemsLinearly(   # Animate canvas items moving each of their 
+            self, items,     # coordinates linearly to new destinations
+            toPositions,     # Items can be single or multiple, but not tags
+            steps=10,        # Number of intermediate steps along line
+            sleepTime=0.1):  # Base time between steps (adjusted by user)
+        for step, _ in self.moveItemsLinearlySequence(
+                items, toPositions, steps):
+            self.wait(sleepTime)
+
+    def moveItemsLinearlySequence( # Iterator for moveItemsLinearly
+            self, items, toPositions, steps=10):
+        if not isinstance(items, (list, tuple, set)):
+            items = (items,)
+        if not isinstance(toPositions, (list, tuple)):
+            raise ValueError('toPositions must be a list or tuple of positions')
+        if not isinstance(toPositions[0], (list, tuple)):
+            toPositions = (toPositions,)
+        if len(items) != len(toPositions):
+            raise ValueError('Number of items must match length of toPositions')
+        steps = max(1, steps) # Must use at least 1 step
+        moveBy = [divide_vector(subtract_vector(toPos, fromPos), steps)
+                  for toPos, fromPos in zip(
+                          toPositions,
+                          [self.canvas.coords(item) for item in items])]
+
+        # move the items until they reach the toPositions
+        for step in range(steps):
+            for i, item in enumerate(items):
+                self.canvas.coords(item, *add_vector(self.canvas.coords(item),
+                                                     moveBy[i]))
+            yield (step, steps) # Yield step in sequence
+            
+        # Force position of new objects to their exact destinations
+        for pos, item in zip(toPositions, items):
+            self.canvas.coords(item, *pos)
+             
     def moveItemsOnCurve(    # Animate canvas items moving from their current
             self, items,     # location to destinations along a curve
             toPositions,     # items can be a single item or list of items
             startAngle=90,   # Starting angle away from destination
             steps=10,        # Number of intermediate steps to reach destination
             sleepTime=0.1):  # Base time between steps (adjusted by user)
+        for step, _ in self.moveItemsOnCurveSequence(
+                items, toPositions, startAngle, steps):
+            self.wait(sleepTime)
+            
+    def moveItemsOnCurveSequence( # Iterator for moveItemsOnCurve
+            self, items, toPositions, startAngle=90, steps=10):
         if not isinstance(items, (list, tuple, set)):
             items = tuple(items)
         if not isinstance(toPositions, (list, tuple)):
@@ -621,7 +733,7 @@ class VisualizationApp(object):  # Base class for Python visualizations
                                   (toGo + 1) / scale),
                     ang)
                 self.canvas.move(item, *moveBy)
-            self.wait(sleepTime)
+            yield (step, steps) # Yield step in sequence
             
         # Force position of new objects to their exact destinations
         for pos, item in zip(toPositions, items):
