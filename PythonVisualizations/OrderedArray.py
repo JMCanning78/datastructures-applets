@@ -101,23 +101,23 @@ def insert(self, item):    # Insert item into the correct position
         callEnviron |= set(indexK)  
 
        # for k in range(len(self.list) - 1, j, -1):  # Move bigger items right
-        self.highlightCodeTags('while_loop', callEnviron1)
+        self.highlightCodeTags('while_loop', callEnviron)
         self.wait(0.2)         
         while 0 < k and self.list[k-1].val > val: # over items             
 
             self.moveItemsBy(indexK, (-self.CELL_SIZE, 0), sleepTime=0.1)  # Move "k" arrow
-            self.highlightCodeTags('make_room', callEnviron1)
+            self.highlightCodeTags('make_room', callEnviron)
             self.wait(0.2)  
             self.list[k].val = self.list[k - 1].val # Move larger item to right            
             self.assignElement(k - 1, k, callEnviron)          
             k -= 1  # Advance left among items    
-            self.highlightCodeTags('decrement_count', callEnviron1)
+            self.highlightCodeTags('decrement_count', callEnviron)
             self.wait(0.2)                
         # Location of the new cell in the array
         toPositions = (self.cellCoords(k),
                        self.cellCenter(k))
 
-        self.highlightCodeTags('insert_item', callEnviron1)
+        self.highlightCodeTags('insert_item', callEnviron)
         self.wait(0.2)
         
         # Animate arrival of new value from operations panel area
@@ -409,8 +409,10 @@ def delete(self, item):
     }
         
     def remove(self, val):
-        callEnviron = self.createCallEnvironment()         
-    
+        #callEnviron = self.createCallEnvironment()   
+        callEnviron = self.createCallEnvironment(
+            self.removeCode.strip(), self.removeCodeSnippets)  
+        
         self.startAnimations()
 
         index = self.search(val)
@@ -422,7 +424,7 @@ def delete(self, item):
 
             n = self.list[index]
             # if the value is found
-            self.highlightCodeTags('key_comparison', callEnviron1)
+            self.highlightCodeTags('key_comparison', callEnviron)
             self.wait(0.2)            
             
             # Slide value rectangle up and off screen
@@ -431,9 +433,9 @@ def delete(self, item):
             callEnviron |= set(items)            
             
             # decrement nItems
-            self.highlightCodeTags('decrement_count', callEnviron1)
+            self.highlightCodeTags('decrement_count', callEnviron)
             self.wait(0.2)
-            self.highlightCodeTags('shift_loop_increment', callEnviron1)
+            self.highlightCodeTags('shift_loop_increment', callEnviron)
             self.wait(0.2)            
 
 
@@ -446,13 +448,13 @@ def delete(self, item):
             # Slide values from right to left to fill gap
             for i in range(index+1, len(self.list)):
                 self.assignElement(i, i - 1, callEnviron)
-                self.highlightCodeTags('shift_items', callEnviron1)
+                self.highlightCodeTags('shift_items', callEnviron)
                 self.wait(0.2)                   
                 self.moveItemsBy(kIndex, (self.CELL_SIZE, 0), sleepTime=0.01) 
-                self.highlightCodeTags('shift_loop_increment', callEnviron1)
+                self.highlightCodeTags('shift_loop_increment', callEnviron)
                 self.wait(0.2)                   
             self.moveItemsBy(self.nItems, (-self.CELL_SIZE, 0), sleepTime=0.01)
-            self.highlightCodeTags('success', callEnviron1)
+            self.highlightCodeTags('success', callEnviron)
             # delete the last cell from the list and as a drawable 
             n = self.list.pop()  
             self.canvas.delete(n.display_shape)
@@ -460,7 +462,7 @@ def delete(self, item):
             # update window
             self.wait(0.2)
         # Animation stops
-        self.highlightCodeTags([], callEnviron1)
+        self.highlightCodeTags([], callEnviron)
 
         self.cleanUp(callEnviron)
         self.stopAnimations()
