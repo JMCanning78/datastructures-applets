@@ -82,16 +82,18 @@ def insert(self, item):    # Insert item into the correct position
     insertCodeSnippets = {
         'full_array': ('1.4','1.23'),
         'start': ('4.04', '4.end'),
-        'while_loop':('5.01','5.1'),
-        'make_room': ('6.3','6.38'),
-        'decrement_count': ('7.8','7.44'),
-        'insert_item': ('9.12','9.end'),
-        'increment_items': ('10.8','10.end')
+        'while_loop':('6.01','6.end'),
+        'make_room': ('7.04','7.end'),
+        'decrement_count': ('8.8','8.end'),
+        'insert_item': ('10.12','10.end'),
+        'increment_items': ('11.01','11.end')
     }
 
     def insert(self, val):
-        callEnviron = self.createCallEnvironment()
         self.startAnimations()
+        
+        callEnviron = self.createCallEnvironment(
+            self.insertCode.strip(), self.insertCodeSnippets)         
 
         k=len(self.list)
 
@@ -134,6 +136,10 @@ def insert(self, item):    # Insert item into the correct position
         self.list[k]= (drawable(
             val, self.canvas.itemconfigure(cellPair[0], 'fill')[-1], *cellPair))
         callEnviron ^= set(cellPair)  # New item is no longer temporary
+        
+        
+        self.highlightCodeTags('increment_items', callEnviron)
+        self.wait(0.2)              
         
         # Move nItems pointer
         self.moveItemsBy(self.nItems, (self.CELL_SIZE, 0))
@@ -459,7 +465,6 @@ def delete(self, item):
     def remove(self, val):
         self.startAnimations()
         
-        #callEnviron = self.createCallEnvironment()   
         callEnviron = self.createCallEnvironment(
             self.removeCode.strip(), self.removeCodeSnippets)  
         
