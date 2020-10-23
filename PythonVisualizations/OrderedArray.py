@@ -204,10 +204,10 @@ def insert(self, item):    # Insert item into the correct position
 
         # update window
         self.window.update()
-        self.stopAnimations()
 
         # Clean up animations
         self.cleanUp(callEnviron)
+        self.stopAnimations()        
         
     def assignElement(
             self, fromIndex, toIndex, callEnviron,
@@ -533,12 +533,77 @@ def delete(self, item):
         super().cleanUp(*args, **kwargs) # Do the VisualizationApp clean up
         self.fixCells()       # Restore cells to their coordinates in array
 
+    traverseCode = """
+def traverse(self, function=print):
+    for j in range(self.nItems):
+        function(self.__a[j])
+    """
+
+    traverseCodeSnippets = {
+        'loop': ('2.8','2.32'),
+        'print': ('3.8','3.end'),
+    }
+    def traverse(self):
+        self.startAnimations()
+     
+        callEnviron = self.createCallEnvironment(
+            self.traverseCode.strip(), self.traverseCodeSnippets)        
+        
+        # draw an index pointing to the first cell
+        indexDisplay = self.createIndex(0, 'j')
+        callEnviron |= set(indexDisplay)
+
+        # draw output box
+        canvasDimensions = self.widgetDimensions(self.canvas)
+        spacing = self.CELL_SIZE * 3 // 4
+        padding = 10
+        outputBox = self.canvas.create_rectangle(
+            (canvasDimensions[0] - len(self.list) * spacing - padding) // 2,
+            canvasDimensions[1] - self.CELL_SIZE - padding,
+            (canvasDimensions[0] + len(self.list) * spacing + padding) // 2,
+            canvasDimensions[1] - padding,
+            fill = self.OPERATIONS_BG)
+        callEnviron.add(outputBox)
+
+        self.highlightCodeTags('loop', callEnviron)
+        self.wait(0.3)
+        for j in range(len(self.list)):
+            # calculate where the value will need to move to
+            outputBoxCoords = self.canvas.coords(outputBox)
+            midOutputBox = (outputBoxCoords[3] + outputBoxCoords[1]) // 2
+
+            # create the value to move to output box
+            valueOutput = self.copyCanvasItem(self.list[j].display_val)
+            valueList = (valueOutput,)
+            callEnviron.add(valueOutput)
+
+            # move value to output box
+            self.highlightCodeTags('print', callEnviron)
+            toPositions = (outputBoxCoords[0] + padding/2 + (j + 1/2)*spacing, 
+                           midOutputBox)
+            self.moveItemsTo(valueList, (toPositions,), sleepTime=.02)
+
+            # make the value 25% smaller
+            newFont = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
+            self.canvas.itemconfig(valueOutput, font=newFont)
+
+            # wait and then move the index pointer over
+            self.wait(0.2)
+            self.highlightCodeTags('loop', callEnviron)
+            self.moveItemsBy(indexDisplay, (self.CELL_SIZE, 0), sleepTime=0.03)
+
+            self.wait(0.3)
+
+        self.highlightCodeTags([], callEnviron)
+        self.cleanUp(callEnviron)
 
     def makeButtons(self):
         vcmd = (self.window.register(numericValidate),
                 '%d', '%i', '%P', '%s', '%S', '%v', '%V', '%W')
         newSizeArrayButton = self.addOperation(
-            "New", lambda: self.clickNew(), numArguments=1, validationCmd=vcmd)        
+            "New", lambda: self.clickNew(), numArguments=1, validationCmd=vcmd)    
+        traverseButton = self.addOperation(
+            "Traverse", lambda: self.traverse())        
         searchButton = self.addOperation(
             "Search", lambda: self.clickSearch(), numArguments=1, validationCmd=vcmd)
         randomFillButton = self.addOperation(
@@ -551,7 +616,7 @@ def delete(self, item):
             "Delete Rightmost", lambda: self.removeFromEnd())
         #this makes the pause, play and stop buttons 
         self.addAnimationButtons()
-        return [searchButton, insertButton, deleteValueButton, newSizeArrayButton, randomFillButton,
+        return [traverseButton, searchButton, insertButton, deleteValueButton, newSizeArrayButton, randomFillButton,
                 deleteRightmostButton]
 
     def validArgument(self):
