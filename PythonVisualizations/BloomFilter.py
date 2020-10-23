@@ -24,7 +24,7 @@ class BloomFilter(HashBase):
     OFF_COLOR = 'white'
     PROBE_COLOR = 'red'
     PROBE_FAILED = 'gray60'
-    INSERTED_FONT = (VisualizationApp.CONTROLS_FONT[0], 14)
+    INSERTED_FONT = (VisualizationApp.CONTROLS_FONT[0], -14)
     INSERTED_COLOR = 'darkblue'
     INSERTED_BG = 'wheat'
     BV_X0 = CELL_SIZE
@@ -69,7 +69,7 @@ class BloomFilter(HashBase):
         p4 = add_vector(tip, offset)
         delta = rotate_vector(
             multiply_vector(subtract_vector(p4, p1), 1/3),
-            20 * max(-1, min(1, (p4[0] - p1[0]) / (p1[1] - p4[1]))))
+            -20 * max(-1, min(1, (p4[0] - p1[0]) / (p1[1] - p4[1]))))
         steps = int(max(abs(tip[0] - origin[0]), abs(tip[1] - origin[1])))
         return self.canvas.create_line(
             *origin, *p1, *add_vector(p1, delta),
@@ -254,7 +254,8 @@ class BloomFilter(HashBase):
         self.insertedBox = self.canvas.create_rectangle(
             *self.insertedBoxPos, fill=self.INSERTED_BG)
         self.insertedKeys = self.canvas.create_text(
-            *add_vector(self.insertedBoxPos, (self.CONTROLS_FONT[1], ) * 2),
+            *add_vector(self.insertedBoxPos, 
+                        (abs(self.CONTROLS_FONT[1]), ) * 2),
             anchor=NW, font=self.INSERTED_FONT, fill=self.INSERTED_COLOR,
             state=DISABLED)
         self.updateInserted()
@@ -268,12 +269,13 @@ class BloomFilter(HashBase):
         
         # Break text into lines at whitespace
         lines = text.split('\n')
-        max_chars = (self.insertedBoxPos[2] - self.insertedBoxPos[0]) // (
-            int(self.INSERTED_FONT[1] / 2))
-        while len(lines[-1]) > max_chars:
+        textWidth = lambda txt: self.textWidth(self.INSERTED_FONT, txt)
+        pad = abs(self.INSERTED_FONT[1])
+        maxWidth = self.insertedBoxPos[2] - self.insertedBoxPos[0] - pad
+        while textWidth(lines[-1]) > maxWidth:
             words = lines[-1].split()
             line = ''
-            while words and len(line) + len(words[0]) + 1 < max_chars:
+            while words and textWidth(line + words[0] + ' ') < maxWidth:
                 line += words.pop(0) + ' '
             lines[-1:] = [line, ' '.join(words)]
         self.canvas.itemconfigure(self.insertedKeys, text = '\n'.join(lines))
@@ -335,8 +337,8 @@ class BloomFilter(HashBase):
             self.INSERTED_BG)
         
     def makeButtons(self):
-        vcmd = (self.window.register(makeWidthValidate(self.maxArgWidth)), 
-                '%P')
+        vcmd = (self.window.register(
+            makeFilterValidate(self.maxArgWidth, ',')), '%P')
         insertButton = self.addOperation(
             "Insert", self.clickInsert, numArguments=1, validationCmd=vcmd)
         findButton = self.addOperation(
@@ -356,6 +358,12 @@ class BloomFilter(HashBase):
             variable=self.showInserts, cleanUpBefore=False)
         self.addAnimationButtons()
         return [findButton, insertButton, newButton, showInsertsButton]
+    
+def makeFilterValidate(maxWidth, exclude=''):
+    "Register this with one parameter: %P"
+    return lambda value_if_allowed: (
+        len(value_if_allowed) <= maxWidth and
+        all(c not in exclude for c in value_if_allowed))
 
 if __name__ == '__main__':
     bloomFilter = BloomFilter()

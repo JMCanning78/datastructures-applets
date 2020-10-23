@@ -110,7 +110,7 @@ class SimpleArraySort(VisualizationApp):
         toCellCenter = self.cellCenter(index)
         tempCellCoords = self.canvas.coords(temp.display_shape)
         deltaX = toCellCoords[0] - tempCellCoords[0]
-        startAngle = 90 * 500 / (500 + abs(deltaX)) * (-1 if deltaX < 0 else 1)
+        startAngle = -45 * 500 / (500 + abs(deltaX)) * (-1 if deltaX < 0 else 1)
 
         self.moveItemsOnCurve(
             (temp.display_shape, temp.display_val),
@@ -151,7 +151,7 @@ class SimpleArraySort(VisualizationApp):
 
         cell_coords = self.cellCoords(index)
         cell_center = self.cellCenter(index)
-        level_spacing = self.VARIABLE_FONT[1]
+        level_spacing = abs(self.VARIABLE_FONT[1])
         x = cell_center[0]
         if level > 0:
             y0 = cell_coords[1] - self.CELL_SIZE * 3 // 5 - level * level_spacing
@@ -203,7 +203,8 @@ def insert(self, item):
         self.moveItemsTo(cellPair, toPositions, steps=self.CELL_SIZE, sleepTime=0.01)
 
         # add a new Drawable with the new value, color, and display objects
-        self.list.append(drawable(val, self.canvas.itemconfigure(cellPair[0], 'fill') [-1], *cellPair))
+        self.list.append(drawable(
+            val, self.canvas.itemconfigure(cellPair[0], 'fill')[-1], *cellPair))
         callEnviron ^= set(cellPair) # Remove new cell from temp call environ
 
         # advance index for next insert
@@ -374,43 +375,47 @@ def find(self, item):
         self.cleanUp(callEnviron)
         return None
 
+    def toTarget(         # Return the vector between the indexed item's
+            self, index): # current position and its normal position in array
+        return subtract_vector(
+            self.cellCoords(index), 
+            self.canvas.coords(self.list[index].display_shape)[:2])
+    
     def shuffle(self):
         self.startAnimations()
         callEnviron = self.createCallEnvironment()
 
-        y = self.ARRAY_Y0
-        for i in range(len(self.list)):
-            newI = random.randint(0, len(self.list) - 1)
-            self.list[i], self.list[newI] = self.list[newI], self.list[i]
+        nItems = len(self.list)    
+        random.shuffle(self.list)  # Randomly move items internally in array
 
-        times = 0
+        coords0 = self.cellCoords(0) # Get the height of a cell
+        height = int(coords0[3] - coords0[1])
+        
+        velocity = [ # Initial velocity is mostly down and towards destination
+            (random.randint(int(dx / 3) - 1, 1) if dx < 0 else
+             random.randint(-1, int(dx / 3) + 1),
+             random.randint(int(height * 1 / 3), height + int(abs(dx) / 8)))
+            for dx, dy in [self.toTarget(i) for i in range(nItems)]]
+        
+        steps = 20
+        for step in range(steps):
+            stepsToGo = steps - step
+            jitter = max(1, int(stepsToGo * 2 / 3))
+            half = max(1, jitter // 2)
+            for i in range(nItems):
+                for item in self.list[i][2:]: # Get drawable shape and val
+                    if item:       # If not None, move it by velocity
+                        self.canvas.move(item, *velocity[i])
+                velocity[i] = add_vector(  # Change velocity to move towards
+                    add_vector(            # target location
+                        multiply_vector(velocity[i], 0.8), 
+                        divide_vector(self.toTarget(i), stepsToGo)),
+                    (random.randint(-jitter, jitter), # Add some random jitter
+                     random.randint(-half, half)))
+            self.wait(0.05)
 
-        # Scramble positions
-        canvasDimensions = self.widgetDimensions(self.canvas)
-        DX = self.CELL_SIZE * 3 / 5
-        DY = DX
-        while times < len(self.list) * 2:
-            down = max(0, 5 - times) * self.CELL_SIZE // 5
-            for i in range(len(self.list)):
-                if self.wait(0.01):
-                    break
-                bBox = self.canvas.coords(self.list[i].display_shape)
-                shuffleY = random.randint(
-                    max(down - DY, -bBox[1]),
-                    min(down + DY, canvasDimensions[1] - bBox[3]))
-                shuffleX = random.randint(
-                    max(-DX, -bBox[0]), min(DX, canvasDimensions[0] - bBox[2]))
-                self.moveItemsBy(
-                    (self.list[i].display_shape, self.list[i].display_val),
-                    (shuffleX, shuffleY),
-                    steps=1, sleepTime=0)
-            times += 1
-            if self.wait(0.01):
-                break
-            self.window.update()
-
-        # Animate return of values to their array cells
-        self.stopMergeSort()
+        # Ensure all items get to new positions
+        self.fixCells()
 
         # Animation stops
         self.cleanUp(callEnviron)
@@ -676,48 +681,13 @@ def selectionSort(self):
         # Animation stops
         self.highlightCodeTags([], callEnviron)
         self.cleanUp(callEnviron)
-        
-    def stopMergeSort(self, toX=ARRAY_X0, toY=ARRAY_Y0):
-        # bring all cells up to original position
-
-        dy = -2
-        dx = [0] * len(self.list)
-        done = [False] * len(self.list)
-        doneCount = 0
-
-        # calculate dx for each node to move it back to original position
-        for i in range(len(self.list)):
-            fromX = self.canvas.coords(self.list[i].display_shape)[0]
-            fromY = self.canvas.coords(self.list[i].display_shape)[1]
-            if toY < fromY:
-                dx[i] = dy * ((toX + self.CELL_SIZE * i) - fromX) / (toY - fromY)
-            else:
-                done[i] = True
-                doneCount += 1
-
-        # while all of the elements have not yet been returned to the original position
-        while doneCount < len(self.list):
-            for i in range(len(self.list)):
-                # move the done elements up by dy and corresponding dx
-                if not done[i]:
-                    self.canvas.move(self.list[i].display_shape, dx[i], dy)
-                    self.canvas.move(self.list[i].display_val, dx[i], dy)
-
-                    # when the cell is in the correct position, mark it as done
-                    if self.canvas.coords(self.list[i].display_shape)[1] <= toY:
-                        doneCount += 1
-                        done[i] = True
-
-            self.window.update()
-            if self.wait(0.01):
-                break
-
-        self.fixCells()
 
     def fixCells(self):  # Move canvas display items to exact cell coords
         for i, drawItem in enumerate(self.list):
-            self.canvas.coords(drawItem.display_shape, *self.cellCoords(i))
-            self.canvas.coords(drawItem.display_val, *self.cellCenter(i))
+            if drawItem.display_shape:
+                self.canvas.coords(drawItem.display_shape, *self.cellCoords(i))
+            if drawItem.display_val:
+                self.canvas.coords(drawItem.display_val, *self.cellCenter(i))
         self.window.update()
 
     def cleanUp(self, *args, **kwargs): # Customize clean up for sorting

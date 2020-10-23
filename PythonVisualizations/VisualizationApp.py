@@ -13,6 +13,7 @@ The control panel has containers for
 import time, math, operator, re, sys
 from collections import *
 from tkinter import *
+import tkinter.font as tkfont
 
 try:
     from coordinates import *
@@ -77,11 +78,11 @@ def makeWidthValidate(maxWidth):
 
 geom_delims = re.compile(r'[\sXx+-]')
 
-
 class VisualizationApp(object):  # Base class for Python visualizations
 
     # Default styles for display of values and operational controls
-    FONT_SIZE = 20
+    DEFAULT_BG = 'white'
+    FONT_SIZE = -20
     VALUE_FONT = ('Helvetica', FONT_SIZE)
     VALUE_COLOR = 'black'
     VARIABLE_FONT = ('Courier', FONT_SIZE * 8 // 10)
@@ -90,10 +91,10 @@ class VisualizationApp(object):  # Base class for Python visualizations
     FOUND_COLOR = 'green2'
     OPERATIONS_BG = 'beige'
     OPERATIONS_BORDER = 'black'
-    CODE_FONT = ('Courier', 12)
-    SMALL_FONT = ('Helvetica', 9)
+    CODE_FONT = ('Courier', -12)
+    SMALL_FONT = ('Helvetica', -9)
     CODE_HIGHLIGHT = 'yellow'
-    CONTROLS_FONT = ('Helvetica', 12)
+    CONTROLS_FONT = ('Helvetica', -12)
     HINT_FONT = CONTROLS_FONT + ('italic',)
     HINT_FG = 'blue'
     HINT_BG = 'beige'
@@ -127,7 +128,8 @@ class VisualizationApp(object):  # Base class for Python visualizations
             if title:
                 self.window.title(title)
         self.canvas = Canvas(
-            self.window, width=canvasWidth, height=canvasHeight)
+            self.window, width=canvasWidth, height=canvasHeight,
+            bg=self.DEFAULT_BG)
         self.canvas.pack(expand=True, fill=BOTH)
         self.maxArgWidth = maxArgWidth
 
@@ -142,9 +144,10 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.pauseButton, self.stopButton = None, None
  
     def setUpControlPanel(self):  # Set up control panel structure
-        self.controlPanel = Frame(self.window)
+        self.controlPanel = Frame(self.window, bg=self.DEFAULT_BG)
         self.controlPanel.pack(side=BOTTOM, expand=True, fill=X)
-        self.operationsUpper = LabelFrame(self.controlPanel, text="Operations")
+        self.operationsUpper = LabelFrame(
+            self.controlPanel, text="Operations", bg=self.DEFAULT_BG)
         self.operationsUpper.grid(row=0, column=0)
         self.operationsPadding = Frame(
             self.operationsUpper, padx=2, pady=2, bg=self.OPERATIONS_BORDER)
@@ -152,11 +155,12 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.operations = Frame(self.operationsPadding, bg=self.OPERATIONS_BG)
         self.opSeparator = None
         self.operations.pack(side=LEFT)
-        self.operationsLower = Frame(self.controlPanel)
+        self.operationsLower = Frame(self.controlPanel, bg=self.DEFAULT_BG)
         self.operationsLower.grid(row=1, column=0)
-        self.operationsLowerCenter = Frame(self.operationsLower, padx=2, pady=5)
+        self.operationsLowerCenter = Frame(
+            self.operationsLower, padx=2, pady=5, bg=self.DEFAULT_BG)
         self.operationsLowerCenter.pack(side=TOP)
-        self.codeFrame = Frame(self.controlPanel)
+        self.codeFrame = Frame(self.controlPanel, bg=self.DEFAULT_BG)
         self.codeFrame.grid(row=0, column=1, rowspan=2, sticky=(N, E, S, W))
         # self.controlPanel.grid_columnconfigure(1, maxsize=200)
         self.codeText = None
@@ -170,21 +174,23 @@ class VisualizationApp(object):  # Base class for Python visualizations
         self.speedScale.set(self.SPEED_SCALE_DEFAULT)
         self.slowLabel = Label(
             self.operationsLowerCenter, text="Animation speed:  slow",
-            font=self.CONTROLS_FONT)
+            font=self.CONTROLS_FONT, bg=self.DEFAULT_BG)
         self.slowLabel.grid(row=0, column=0, sticky=W)
         self.fastLabel = Label(
-            self.operationsLowerCenter, text="fast", font=self.CONTROLS_FONT)
+            self.operationsLowerCenter, text="fast", font=self.CONTROLS_FONT,
+            bg=self.DEFAULT_BG)
         self.fastLabel.grid(row=0, column=2, sticky=W)
         self.textEntries, self.entryHints = [], []
         self.outputText = StringVar()
         self.outputText.set('')
         self.message = Label(
             self.operationsLowerCenter, textvariable=self.outputText,
-            font=self.CONTROLS_FONT + ('italic',), fg="blue")
+            font=self.CONTROLS_FONT + ('italic',), fg="blue",
+            bg=self.DEFAULT_BG)
         self.message.grid(row=0, column=4, sticky=(E, W))
         self.operationsLowerCenter.grid_columnconfigure(4, minsize=200)
         self.operationsLowerCenter.grid_columnconfigure(3, minsize=10)
-
+        
     buttonTypes = (Button, Checkbutton, Radiobutton)
     
     def addOperation(  # Add a button to the operations control panel
@@ -374,8 +380,9 @@ class VisualizationApp(object):  # Base class for Python visualizations
     def showCode(self,     # Show algorithm code in a scrollable text box
                  code,     # Code to display, plus optional boundary line
                  addBoundary=False, # to separate calls on the stack
-                 prefix='',    # Prefix to apply to snippet labels
-                 snippets={}): # Dict of snippet label -> text indices
+                 prefix='',      # Prefix to apply to snippet labels
+                 snippets={},    # Dict of snippet label -> text indices
+                 sleepTime=0):   # Wait time between adding lines of text
         code = code.strip()
         if len(code) == 0:  # Empty code string?
             return          # then nothing to show
@@ -410,16 +417,23 @@ class VisualizationApp(object):  # Base class for Python visualizations
             self.codeText.tag_add('call_stack_boundary', '1.0', '1.end')
         
         # Add code at top of text widget (above stack boundary, if any)
-        self.codeText.insert('1.0', code + '\n')
-        self.codeText.see('1.0')
+        if sleepTime > 0:
+            for line in reversed(code.split('\n')):
+                if self.codeText:
+                    self.codeText.insert('1.0', line + '\n')
+                self.wait(sleepTime)
+        else:
+            self.codeText.insert('1.0', code + '\n')
+        if self.codeText:
+            self.codeText.see('1.0')
         self.window.update()
         self.resizeCodeText()
        
         # Tag the snippets with unique tag name
-        for tagName in snippets:
-            self.codeText.tag_add(prefix + tagName, *snippets[tagName])
-        self.codeText.configure(state=DISABLED)
-
+        if self.codeText:
+            for tagName in snippets:
+                self.codeText.tag_add(prefix + tagName, *snippets[tagName])
+            self.codeText.configure(state=DISABLED)
 
     def resizeCodeText(self, event=None):
         if self.codeText and self.codeText.winfo_ismapped():
@@ -437,12 +451,13 @@ class VisualizationApp(object):  # Base class for Python visualizations
             if desired != nCharsWide:
                 ct['width'] = desired
 
-    def highlightCodeTags(self, tags, callEnviron):
+    def highlightCodeTags(self, tags, callEnviron, wait=0):
         codeHighlightBlock = self.getCodeHighlightBlock(callEnviron)
         if codeHighlightBlock is None:  # This shouldn't happen, but...
             return
         if not isinstance(tags, (list, tuple, set)):
             tags = [tags]
+        found = False       # Assume tag not found
         for tagName in self.codeText.tag_names() if self.codeText else []:
             if not tagName.startswith(codeHighlightBlock.prefix):
                 continue  # Only change tags for this call environment
@@ -452,9 +467,15 @@ class VisualizationApp(object):  # Base class for Python visualizations
                 background=self.CODE_HIGHLIGHT if highlight else '',
                 underline=1 if highlight else 0)
             if highlight:
+                found = True
                 ranges = self.codeText.tag_ranges(tagName)
                 if len(ranges) > 0:
                     self.codeText.see(ranges[0])
+        if not found and len(tags) > 0:  # This shouldn't happen so log bug
+            print('Unable to find highlight tag(s) {} among {}'.format(
+                ', '.join(tags), ', '.join(codeHighlightBlock.snippets.keys())))
+        if wait > 0:              # Optionally weit for highlight to show
+            self.wait(wait)
         
 
     # Return the CodeHighlightBlock from the set object from the call stack
@@ -470,15 +491,16 @@ class VisualizationApp(object):  # Base class for Python visualizations
             
     def cleanUp(self,         # Remove Tk items from past animations either
                 callEnviron=None,  # for a particular call or all calls
-                stopAnimations=True): # and stop animations
+                stopAnimations=True, # stop animations if requested and
+                sleepTime=0): # wait between removing code lines from stack
         if stopAnimations:
             self.stopAnimations()
         minStack = 1 if callEnviron else 0 # Don't clean beyond minimum, keep
         while len(self.callStack) > minStack: # 1st call unless cleaning all
             top = self.callStack.pop()
-            self.cleanUpCallEnviron(top)
-            if callEnviron and callEnviron == top: # Stop popping stack if a
-                break         # a particular call was being cleaned up
+            self.cleanUpCallEnviron(top, sleepTime)
+            if callEnviron is not None and callEnviron == top: # Stop popping
+                break         # stack if a particular call was being cleaned up
                 
         if callEnviron is None:  # Clear any messages if cleaning up everything
             self.setMessage()
@@ -488,7 +510,9 @@ class VisualizationApp(object):  # Base class for Python visualizations
                 tkItem[1].destroy()
             self.codeText = None
 
-    def cleanUpCallEnviron(self, callEnviron): # Clean up a call on the stack
+    def cleanUpCallEnviron(    # Clean up a call on the stack
+            self, callEnviron, # removing the call environement
+            sleepTime=0):      # waiting sleepTime between removing code lines
         while len(callEnviron):
             thing = callEnviron.pop()
             if isinstance(thing, (str, int)) and self.canvas.type(thing):
@@ -496,29 +520,64 @@ class VisualizationApp(object):  # Base class for Python visualizations
             elif isinstance(thing, CodeHighlightBlock) and self.codeText:
                 self.codeText.configure(state=NORMAL)
                 last_line = int(float(self.codeText.index(END)))
-                self.codeText.delete(
-                    '1.0', '{}.0'.format(min(last_line, thing.lines + 2)))
-                self.codeText.configure(state=DISABLED)
+                for i in range(1, min(last_line, thing.lines + 2)):
+                    if self.codeText:
+                        self.codeText.delete('1.0', '2.0')
+                        if sleepTime > 0:
+                            self.wait(sleepTime)
+                if self.codeText:
+                    self.codeText.configure(state=DISABLED)
 
     def createCallEnvironment( # Create a call environment on the call stack
             self,              # for animating a particular call
             code='',           # code for this call, if any
-            snippets={}):      # code snippet dictionary, if any
+            snippets={},       # code snippet dictionary, if any
+            sleepTime=0):      # Wait time between inserting lines of code
         # The call environment is a set for local variables represented by
         # canvas items plus a codeHighlightBlock that controls code highlights
         codeHighlightBlock = CodeHighlightBlock(code, snippets)
         callEnviron = set([codeHighlightBlock])
         self.callStack.append(callEnviron) # Push environment on stack
         self.showCode(code, addBoundary=True, prefix=codeHighlightBlock.prefix,
-                      snippets=snippets)
+                      snippets=snippets, sleepTime=sleepTime)
         return callEnviron
         
-    # Tk widget methods
+    # General Tk widget methods
     def widgetDimensions(self, widget):  # Get widget's (width, height)
         geom = geom_delims.split(widget.winfo_geometry())
         if geom[0] == '1' and geom[1] == '1':  # If not yet managed, use config
             geom = (widget.config('width')[-1], widget.config('height')[-1])
         return int(geom[0]), int(geom[1])
+
+    sizePattern = re.compile(r'-?\d+')
+
+    def textWidth(self, font, text=' '):
+        return self.tkFontFromSpec(font).measure(text)
+        
+    def textHeight(self, font, text=' '):
+        lines = text.split('\n')
+        nLines = len(lines) if lines and len(lines[-1]) > 0 else len(lines) - 1
+        return self.tkFontFromSpec(font).metrics()['linespace'] * nLines
+
+    def tkFontFromSpec(self, spec):
+        family = spec[0]
+        size = spec[1] if (len(spec) > 1 and 
+                           (isinstance(spec[1], int) or
+                            (isinstance(spec[1], str) and 
+                             self.sizePattern.match(spec[1])))) else 0
+        return tkfont.Font(
+            family=family, size=size,
+            weight=self.lookFor(('bold', 'light'), spec, 'normal'),
+            slant=self.lookFor(('italic', 'oblique'), spec, 'roman'),
+            underline=1 if self.lookFor(('underline',), spec, 0) else 0,
+            overstrike=1 if self.lookFor(('overstrike',), spec, 0) else 0)
+        
+    def lookFor(self, keys, spec, default):  # Find keyword in font spec
+        strings = [x.lower() for x in spec if isinstance(x, str)]
+        for key in keys:
+            if key.lower() in strings:
+                return key
+        return default
 
     # CANVAS ITEM METHODS
     def canvas_itemconfigure(  # Get a dictionary with the canvas item's
@@ -620,10 +679,11 @@ class VisualizationApp(object):  # Base class for Python visualizations
 
         # move the items in steps along vector
         moveBy = divide_vector(delta, steps)
-        for step in range(steps):
-            for item in items:
-                self.canvas.move(item, *moveBy)
-            yield (step, steps) # Yield step in sequence
+        if len(moveBy) == 2:
+            for step in range(steps):
+                for item in items:
+                    self.canvas.move(item, *moveBy)
+                yield (step, steps) # Yield step in sequence
 
     def moveItemsTo(         # Animate canvas items moving rigidly 
             self, items,     # to destination locations along line(s)
@@ -652,7 +712,10 @@ class VisualizationApp(object):  # Base class for Python visualizations
         # move the items until they reach the toPositions
         for step in range(steps):
             for i, item in enumerate(items):
-                self.canvas.move(item, *moveBy[i])
+                if len(moveBy[i]) == 2:
+                    self.canvas.move(item, *moveBy[i])
+                # else:  # This shouldn't happen, but is a good point to debug
+                #     pdb.set_trace()
             yield (step, steps) # Yield step in sequence
             
         # Force position of new objects to their exact destinations
@@ -693,8 +756,9 @@ class VisualizationApp(object):  # Base class for Python visualizations
         # move the items until they reach the toPositions
         for step in range(steps):
             for i, item in enumerate(items):
-                self.canvas.coords(item, *add_vector(self.canvas.coords(item),
-                                                     moveBy[i]))
+                if len(moveBy[i]) >= 2:
+                    self.canvas.coords(
+                        item, *add_vector(self.canvas.coords(item), moveBy[i]))
             yield (step, steps) # Yield step in sequence
             
         # Force position of new objects to their exact destinations
@@ -728,18 +792,19 @@ class VisualizationApp(object):  # Base class for Python visualizations
             scale = 1 + abs(ang) / 180  # scale is larger for higher angles
             for i, item in enumerate(items):
                 coords = self.canvas.coords(item)[:2]
-                moveBy = rotate_vector(
-                    divide_vector(subtract_vector(toPositions[i], coords),
-                                  (toGo + 1) / scale),
-                    ang)
-                self.canvas.move(item, *moveBy)
+                if len(coords) == 2:
+                    moveBy = rotate_vector(
+                        divide_vector(subtract_vector(toPositions[i], coords),
+                                      (toGo + 1) / scale),
+                        ang)
+                    self.canvas.move(item, *moveBy)
             yield (step, steps) # Yield step in sequence
             
         # Force position of new objects to their exact destinations
         for pos, item in zip(toPositions, items):
             self.canvas.coords(item, *pos)
 
-    # ANIMATION METHODS
+    # ANIMATION CONTROLS
     def speed(self, sleepTime):
         return sleepTime * 50 * self.SPEED_SCALE_MIN / self.speedScale.get()
 
@@ -786,15 +851,16 @@ class VisualizationApp(object):  # Base class for Python visualizations
     def play(self, pauseButton):
         self.startAnimations()
 
-    def startAnimations(self):
+    def startAnimations(self, enableStops=True):
         self.animationState = self.RUNNING
         self.enableButtons(enable=False)
         if self.pauseButton:
             self.pauseButton['text'] = 'Pause'
             self.pauseButton['command'] = self.runOperation(
                 lambda: self.onClick(self.pause, self.pauseButton), False)
-            self.pauseButton['state'] = NORMAL
-        if self.stopButton:
+            if enableStops:
+                self.pauseButton['state'] = NORMAL
+        if self.stopButton and enableStops:
             self.stopButton['state'] = NORMAL
 
     def stopAnimations(self):  # Stop animation of a call on the call stack
@@ -813,6 +879,12 @@ class VisualizationApp(object):  # Base class for Python visualizations
     def pauseAnimations(self):
         self.animationState = self.PAUSED
 
+    def animationsStopped(self):
+        return self.animationState == self.STOPPED
+
+    def animationsRunning(self):
+        return self.animationState != self.STOPPED
+    
     def runVisualization(self):
         self.window.mainloop()
 

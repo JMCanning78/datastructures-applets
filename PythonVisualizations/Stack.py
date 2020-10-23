@@ -189,8 +189,8 @@ def pop(self):
         self.moveItemsTo(valueList, (toPositions,), sleepTime=.02)
 
         # make the value 25% smaller
-        newSize = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
-        self.canvas.itemconfig(valueOutput, font=newSize)
+        newFont = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
+        self.canvas.itemconfig(valueOutput, font=newFont)
 
         # Finish animation
         self.highlightCodeTags([], callEnviron)
@@ -246,8 +246,8 @@ def peek(self):
         self.moveItemsTo(valueList, (toPositions,), sleepTime=.02)
 
         # make the value 25% smaller
-        newSize = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
-        self.canvas.itemconfig(valueOutput, font=newSize)
+        newFont = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
+        self.canvas.itemconfig(valueOutput, font=newFont)
 
         # Finish animation
         self.highlightCodeTags([], callEnviron)

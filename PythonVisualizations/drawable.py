@@ -19,6 +19,10 @@ class drawable(object):      # A record describing a drawable Tk object
             if 0 <= key and key < len(self.__fields):
                 return getattr(self, self.__fields[key])
             raise IndexError
+        elif isinstance(key, slice):
+            return [self[k] for k in range(key.start or 0, 
+                                           key.stop or len(self.__fields), 
+                                           key.step or 1)]
         elif isinstance(key, str):
             return getattr(self, key)
         raise ValueError

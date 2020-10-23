@@ -35,7 +35,7 @@ class Heap(VisualizationApp):
     def createIndex(self, index, level=1, name='nItems'):
         cell_coords = self.cellCoords(index)
         cell_center = self.cellCenter(index)
-        level_spacing = self.SMALL_FONT[1]
+        level_spacing = abs(self.SMALL_FONT[1])
         if level > 0:
             x0 = self.HEAP_X0 - self.CELL_WIDTH * 0.8 - level * level_spacing
             x1 = self.HEAP_X0 - self.CELL_WIDTH * 0.3

@@ -84,13 +84,14 @@ class HashBase(VisualizationApp):
         inputCoords = self.hashInputCoords()
         seedCoords = self.hashSeedCoords()
         outputCoords = self.hashOutputCoords()
+        charWidth = self.textWidth(font, 'W')
         characters = set([
             self.canvas.create_text(
-                inputCoords[0] - ((len(text) - i) * font[1] * 0.8),
+                inputCoords[0] - ((len(text) - i) * charWidth),
                 inputCoords[1], text=c, font=font, fill=color, state=DISABLED)
             for i, c in enumerate(text)] + [
                     self.canvas.create_text(
-                        seedCoords[0] - ((len(seed) - i) * font[1] * 0.5),
+                        seedCoords[0] - ((len(seed) - i) * charWidth),
                         seedCoords[1], text=c, font=font, fill=color,
                         state=DISABLED)
                     for i, c in enumerate(seed)])
@@ -100,7 +101,8 @@ class HashBase(VisualizationApp):
             callEnviron |= characters
 
         output = []        # Characters of hashed output
-        rightEdge = h['BBox'][2] + font[1]
+        pad = abs(font[1])
+        rightEdge = h['BBox'][2] + pad
         leftmostOutput = rightEdge
 
         # While there are input characters or characters yet to output or
@@ -113,8 +115,8 @@ class HashBase(VisualizationApp):
             deletion = False
             for char in list(characters): # For all input characters
                 coords = self.canvas.coords(char)  # See if they entered the
-                if coords[0] - font[1] >= h['BBox'][0]: # hasher boundinb box
-                    deletion = True       # and delete them if they did
+                if coords[0] - pad >= h['BBox'][0]: # hasher bounding box and
+                    deletion = True       # delete them if they did
                     if callEnviron:
                         callEnviron.discard(char)
                     self.canvas.delete(char)
@@ -130,7 +132,7 @@ class HashBase(VisualizationApp):
                 leftmostOutput >= rightEdge):
                 output.append(
                     self.canvas.create_text(
-                        max(leftmostOutput - font[1] * 0.5, outputCoords[0]),
+                        max(leftmostOutput - charWidth, outputCoords[0]),
                         outputCoords[1], text=hashed[-(len(output) + 1)], 
                         font=font, fill=color, state=DISABLED))
                 self.canvas.lower(output[-1])

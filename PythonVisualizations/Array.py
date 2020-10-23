@@ -46,7 +46,7 @@ class Array(VisualizationApp):
 
         cell_coords = self.cellCoords(index)
         cell_center = self.cellCenter(index)
-        level_spacing = self.VARIABLE_FONT[1]
+        level_spacing = abs(self.VARIABLE_FONT[1])
         x = cell_center[0]
         if level > 0:
             y0 = cell_coords[1] - self.CELL_SIZE * 3 // 5 - level * level_spacing
@@ -530,8 +530,8 @@ def traverse(self, function=print):
             self.moveItemsTo(valueList, (toPositions,), sleepTime=.02)
 
             # make the value 25% smaller
-            newSize = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
-            self.canvas.itemconfig(valueOutput, font=newSize)
+            newFont = (self.VALUE_FONT[0], int(self.VALUE_FONT[1] * .75))
+            self.canvas.itemconfig(valueOutput, font=newFont)
 
             # wait and then move the index pointer over
             self.wait(0.2)

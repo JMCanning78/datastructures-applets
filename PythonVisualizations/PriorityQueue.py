@@ -42,7 +42,7 @@ class PriorityQueue(VisualizationApp):
 
         cell_coords = self.cellCoords(index)
         cell_center = self.cellCenter(index)
-        level_spacing = self.VARIABLE_FONT[1]
+        level_spacing = abs(self.VARIABLE_FONT[1])
         x = cell_center[0]
         if level > 0:
             y0 = cell_coords[1] - self.CELL_SIZE * 3 // 5 - level * level_spacing

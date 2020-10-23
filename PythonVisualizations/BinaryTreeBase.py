@@ -30,7 +30,7 @@ class Node(object):
 
 class BinaryTreeBase(VisualizationApp):
     # -------- CONSTANTS ------------------
-    FONT_SIZE = '16'
+    FONT_SIZE = -16
     VALUE_FONT = ('Helvetica', FONT_SIZE)
     FOUND_FONT = ('Helvetica', FONT_SIZE)
 
