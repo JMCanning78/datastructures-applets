@@ -82,11 +82,11 @@ def insert(self, item):    # Insert item into the correct position
     insertCodeSnippets = {
         'full_array': ('1.4','1.23'),
         'start': ('4.04', '4.end'),
-        'while_loop':('6.01','6.end'),
-        'make_room': ('7.04','7.end'),
-        'decrement_count': ('8.8','8.end'),
-        'insert_item': ('10.12','10.end'),
-        'increment_items': ('11.01','11.end')
+        'while_loop':('6.04','6.end'),
+        'make_room': ('7.07','7.end'),
+        'decrement_count': ('8.07','8.end'),
+        'insert_item': ('10.04','10.end'),
+        'increment_items': ('11.04','11.end')
     }
 
     def insert(self, val):
@@ -359,17 +359,17 @@ def find(self, item):            # Find index at or just below
       return lo   # Item not found, return insertion point instead                    
 """
     findCodeSnippets = {
-        'initialize_lo': ('2.4','2.end'),
-        'initialize_hi': ('3.04', '3.end'),
-        'while_loop': ('5.04','5.end'),
+        'initialize_lo': ('2.06','2.end'),
+        'initialize_hi': ('3.06', '3.end'),
+        'while_loop': ('5.06','5.end'),
         'initialize_mid': ('6.8','6.end'),
         'found_mid': ('7.8','7.end'),
-        'success': ('8.10','8.end'),
+        'success': ('8.12','8.end'),
         'upper_half': ('9.8','9.end'),
-        'move_lo': ('10.8', '10.end'),
+        'move_lo': ('10.12', '10.end'),
         'lower_half': ('11.8','11.end'),
-        'move_hi': ('12.8','12.end'),
-        'return_lo': ('14.04','14.end'),      
+        'move_hi': ('12.12','12.end'),
+        'return_lo': ('14.06','14.end'),      
     }
 
 
@@ -540,9 +540,10 @@ def traverse(self, function=print):
     """
 
     traverseCodeSnippets = {
-        'loop': ('2.8','2.32'),
+        'loop': ('2.04','2.32'),
         'print': ('3.8','3.end'),
     }
+    
     def traverse(self):
         self.startAnimations()
      
